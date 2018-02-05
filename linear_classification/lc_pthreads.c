@@ -35,18 +35,19 @@ static void print_time(double const seconds)
   printf("Execution time: %0.04fs\n", seconds);
 }
 
+double startTime, endTime;
 // Timer based methods END...
 
 // TODO : dynamic memory allocation
-float X[15170][DIMENSIONS];
-float Y[15170];
+float **X;//[15170][DIMENSIONS];
+float *Y;//[15170];
 float w[DIMENSIONS];
 
 int no_threads, iter;
 int datapoints, dimensions;
 int noobColumnsMask[DIMENSIONS];
 int w_index[DIMENSIONS];
-float Xw[15170];
+float *Xw;//[15170];
 
 void findNoobColumns() {
 	int i,j;
@@ -150,15 +151,22 @@ int main(int argc, char *argv[]) {
    	fscanf(labelFile, "%d", &datapoints);
 
    	// Initialize
-    int i,j;
+		int i,j;
+		//X = (float **)malloc(sizeof(float *)*datapoints);
+		//X[0] = (float *)malloc(sizeof(float) * datapoints * DIMENSIONS);
+		X = (float **)malloc(datapoints * sizeof(float *));
+		X[0] = (float *)malloc(sizeof(float) * DIMENSIONS * datapoints);
+    for(i = 0; i < datapoints; i++)
+        X[i] = (*X + DIMENSIONS * i);
     for(i=0;i<datapoints;i++)
     	for(j=0;j<DIMENSIONS;j++)
     		fscanf(pointsFile, "%f", &X[i][j]);
+		Y = (float *)malloc(sizeof(float) * datapoints);
     for(i=0;i<datapoints;i++)
     	fscanf(labelFile, "%f",&Y[i]);
 
 		// Timer starts
-		double startTime = monotonic_seconds();
+		startTime = monotonic_seconds();
 
     memset(w,0,sizeof(w));
 
@@ -169,10 +177,10 @@ int main(int argc, char *argv[]) {
     removeNoobColumns();
 
     int iterations;
+		Xw = (float *)malloc(sizeof(float) * datapoints);
     calc_Xw();
     calc_Error();
     for(iterations=0; iterations<iter; iterations++) {
-    	// TODO: parallelize
     	int dim;
     	float temp[dimensions];
     	for(dim=0; dim<dimensions; dim++) {
@@ -180,7 +188,7 @@ int main(int argc, char *argv[]) {
     		subtractY(result);
     		float num = calcNumerator(dim, result);
     		float den = calcDenominator(dim);
-
+				free(result);
     		update_Xw(dim, num/den);
     		w[dim] = num/den;
     	}
@@ -188,12 +196,18 @@ int main(int argc, char *argv[]) {
     	calc_Error();
     }
 
-		// Timer stops
-		double endTime = monotonic_seconds();
-		print_time(endTime-startTime);
-
     // File I/O
 		fclose(pointsFile);
 		fclose(labelFile);
+
+		// free em resources
+		free(X);
+		free(Y);
+		free(Xw);
 	}
+
+	// Timer stops
+	endTime = monotonic_seconds();
+	print_time(endTime-startTime);
+	return 0;
 }
