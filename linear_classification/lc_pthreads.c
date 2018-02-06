@@ -9,7 +9,7 @@
 #define print(n) printf("%d",n)
 #define DIMENSIONS 784
 
-// Timer based methods BEGIN
+// **************************************** Timer based methods BEGIN ****************************************
 
 /**
 * @brief Return the number of seconds since an unspecified time (e.g., Unix
@@ -24,7 +24,6 @@ static inline double monotonic_seconds()
   clock_gettime(CLOCK_MONOTONIC, &ts);
   return ts.tv_sec + ts.tv_nsec * 1e-9;
 }
-
 /**
 * @brief Output the seconds elapsed while execution.
 *
@@ -34,11 +33,10 @@ static void print_time(double const seconds)
 {
   printf("Execution time: %0.04fs\n", seconds);
 }
-
 double startTime, endTime;
-// Timer based methods END...
 
-// TODO : dynamic memory allocation
+// **************************************** Timer based methods END... ****************************************
+
 float **X;//[15170][DIMENSIONS];
 float *Y;//[15170];
 float w[DIMENSIONS];
@@ -48,6 +46,7 @@ int datapoints, dimensions;
 int noobColumnsMask[DIMENSIONS];
 int w_index[DIMENSIONS];
 float *Xw;//[15170];
+float *X2;
 
 void findNoobColumns() {
 	int i,j;
@@ -111,14 +110,16 @@ float calcNumerator(int j, float* result) {
 	return ret;
 }
 
-float calcDenominator(int j) {
-	float ret = 0.0;
-	int i;
-	for(i=0;i<datapoints;i++) {
-		float temp = X[i][get(j)];
-		ret = ret + temp * temp;
+void calcDenominator() {
+	int i,j;
+	for(j=0;j<dimensions;j++) {
+		float ret = 0.0;
+		for(i=0;i<datapoints;i++) {
+			float temp = X[i][get(j)];
+			ret = ret + temp * temp;
+		}
+		X2[j]=ret;
 	}
-	return ret;
 }
 
 void calc_Error() {
@@ -165,35 +166,36 @@ int main(int argc, char *argv[]) {
     for(i=0;i<datapoints;i++)
     	fscanf(labelFile, "%f",&Y[i]);
 
-		// Timer starts
+		// **************************************** Timer starts ****************************************
 		startTime = monotonic_seconds();
 
     memset(w,0,sizeof(w));
 
     // Meaningful code
     memset(noobColumnsMask,0,sizeof(noobColumnsMask));
-    // TODO: Can parallelize
-    findNoobColumns();
-    removeNoobColumns();
+    findNoobColumns(); // TODO: Can parallelize
+    removeNoobColumns(); // TODO: Can parallelize
 
     int iterations;
 		Xw = (float *)malloc(sizeof(float) * datapoints);
-    calc_Xw();
-    calc_Error();
+		X2 = (float *)malloc(sizeof(float) * datapoints);
+		calcDenominator(); // TODO: Can parallelize
+    calc_Xw(); // TODO: Can parallelize
+    calc_Error(); // TODO: Can parallelize
     for(iterations=0; iterations<iter; iterations++) {
     	int dim;
     	float temp[dimensions];
     	for(dim=0; dim<dimensions; dim++) {
-    		float* result = removeDimensionContribution(dim);
-    		subtractY(result);
-    		float num = calcNumerator(dim, result);
-    		float den = calcDenominator(dim);
+    		float* result = removeDimensionContribution(dim); // TODO: Must parallelize
+    		subtractY(result); // TODO: Must parallelize
+    		float num = calcNumerator(dim, result); // TODO: Must parallelize
+    		float den = X2[dim];
 				free(result);
-    		update_Xw(dim, num/den);
+    		update_Xw(dim, num/den); // TODO: Must parallelize
     		w[dim] = num/den;
     	}
     	printf("\n");
-    	calc_Error();
+    	calc_Error(); // TODO: Must parallelize
     }
 
     // File I/O
@@ -206,7 +208,7 @@ int main(int argc, char *argv[]) {
 		free(Xw);
 	}
 
-	// Timer stops
+	// **************************************** Timer stops ****************************************
 	endTime = monotonic_seconds();
 	print_time(endTime-startTime);
 	return 0;
