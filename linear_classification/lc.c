@@ -6,8 +6,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define print(n) printf("%d",n)
-
 // **************************************** Timer based methods BEGIN ****************************************
 
 /**
@@ -46,7 +44,7 @@ int *noobColumnsMask;
 int *w_index;
 float *Xw;//[15170];
 float *X2;
-float* result;
+//float* result;
 
 void findNoobColumns() {
 	int i,j;
@@ -88,23 +86,13 @@ void update_Xw(int j, float val) {
 	}
 }
 
-void removeDimensionContribution(int j) {
+float calcNumerator(int j) {
+	float ret = 0.0, temp = 0.0;
 	int i;
-	for(i=0;i<datapoints;i++)
-		result[i] = Xw[i] - X[i][get(j)] * w[j];
-}
-
-void subtractY() {
-	int i;
-	for(i=0;i<datapoints;i++)
-		result[i] = Y[i] - result[i];
-}
-
-float calcNumerator(int j, float* result) {
-	float ret = 0.0;
-	int i;
-	for(i=0;i<datapoints;i++)
-		ret = ret + X[i][get(j)] * result[i];
+	for(i=0;i<datapoints;i++) {
+		temp = Y[i] - (Xw[i] - X[i][get(j)] * w[j]);
+		ret = ret + X[i][get(j)] * temp;
+	}
 	return ret;
 }
 
@@ -128,6 +116,12 @@ void calc_Error() {
 		ret = ret + temp * temp;
 	}
 	printf("Error : %f\n", ret);
+}
+
+void printW() {
+	int i;
+	for(i=0;i<dimensions;i++)
+		printf("%.8f , ", w[i]);
 }
 
 int main(int argc, char *argv[]) {
@@ -183,20 +177,13 @@ int main(int argc, char *argv[]) {
 		X2 = (float *)malloc(sizeof(float) * datapoints);
 		calcDenominator(); // TODO: Can parallelize
 	    calc_Xw(); // TODO: Can parallelize
-	    calc_Error(); // TODO: Can parallelize
+	    calc_Error(); // TODO: Must parallelize
 	    for(iterations=0; iterations<iter; iterations++) {
 	    	int dim;
 	    	float temp[dimensions];
-	    	for(dim=0; dim<dimensions; dim++) {
-				result = (float *)malloc(sizeof(float)*datapoints);
-	    		removeDimensionContribution(dim); // TODO: Must parallelize
-				// for(t=0;t<no_threads;t++) {
-				// 	pthread_create(&thread[t], &attr, BusyWork, (void *)t);
-				// }
-				subtractY(); // TODO: Must parallelize
-	    		float num = calcNumerator(dim, result); // TODO: Must parallelize
-	    		float den = X2[dim];
-				free(result);
+	    	for(dim=0; dim<dimensions; dim++) {				
+	    		float num = calcNumerator(dim); // TODO: Must parallelize
+	    		float den = X2[dim];				
 	    		update_Xw(dim, num/den); // TODO: Must parallelize
 	    		w[dim] = num/den;
 	    	}
@@ -208,7 +195,7 @@ int main(int argc, char *argv[]) {
 		fclose(pointsFile);
 		fclose(labelFile);
 
-		//printW();
+		printW();
 
 		// free em resources
 		free(X);
