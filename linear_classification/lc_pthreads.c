@@ -239,7 +239,7 @@ int main(int argc, char *argv[]) {
 		fclose(pointsFile);
 		fclose(labelFile);
 
-		printW();
+		//printW();
 
 		// free em resources
 		free(X);
