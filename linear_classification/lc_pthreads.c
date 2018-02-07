@@ -118,8 +118,10 @@ void* calcNumerator(void *c) {
    		temp = Y[i] - (Xw[i] - X[i][get(j)] * w[j]);
 		result = result + X[i][get(j)] * temp;			
    	}
+   	//printf("Thread %ld done. Result = %e\n",startPosition, result);
    	pthread_mutex_lock (&mutexnum);
-   	num += result;   	
+   	num += result;
+   	// printf("Thread %ld did %d to %d:  mysum=%f global sum=%f\n",offset,start,end,mysum,dotstr.sum);
    	pthread_mutex_unlock (&mutexnum);
    	free(c);
    	pthread_exit((void *) 0);
@@ -213,7 +215,6 @@ int main(int argc, char *argv[]) {
 	    	pointsPerThread = (datapoints+no_threads-1)/no_threads;
 	    	for(dim=0; dim<dimensions; dim++) {		
 	    		num = 0.0;		
-	    		//calcNumerator1(dim); // TODO: Must parallelize
 	    		for(t=0; t<no_threads; t++) {
 	    			struct capsule *c = malloc(sizeof(struct capsule));
 	    			c->dimension = dim;
@@ -238,7 +239,7 @@ int main(int argc, char *argv[]) {
 		fclose(pointsFile);
 		fclose(labelFile);
 
-		//printW();
+		printW();
 
 		// free em resources
 		free(X);
