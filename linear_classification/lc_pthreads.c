@@ -7,7 +7,6 @@
 #include <string.h>
 
 #define print(n) printf("%d",n)
-#define DIMENSIONS 784
 
 // **************************************** Timer based methods BEGIN ****************************************
 
@@ -39,12 +38,12 @@ double startTime, endTime;
 
 float **X;//[15170][DIMENSIONS];
 float *Y;//[15170];
-float w[DIMENSIONS];
+float *w;
 
 int no_threads, iter;
 int datapoints, dimensions;
-int noobColumnsMask[DIMENSIONS];
-int w_index[DIMENSIONS];
+int *noobColumnsMask;
+int *w_index;
 float *Xw;//[15170];
 float *X2;
 float* result;
@@ -142,9 +141,9 @@ int main(int argc, char *argv[]) {
 		if(pointsFile == 0)
             printf( "Could not open datapoints file\n" );
 	    if(labelFile == 0)
-	            printf( "Could not open labels file\n" );
+	        printf( "Could not open labels file\n" );
 
-			iter = atoi(argv[3]);
+		iter = atoi(argv[3]);
 	    no_threads = atoi(argv[4]);
 
 	   	fscanf(pointsFile, "%d %d", &datapoints, &dimensions);
@@ -153,13 +152,13 @@ int main(int argc, char *argv[]) {
 	   	// Initialize
 		int i,j;		
 		X = (float **)malloc(datapoints * sizeof(float *));
-		X[0] = (float *)malloc(sizeof(float) * DIMENSIONS * datapoints);
+		X[0] = (float *)malloc(sizeof(float) * dimensions * datapoints);
 	    for(i = 0; i < datapoints; i++)
-	        X[i] = (*X + DIMENSIONS * i);
+	        X[i] = (*X + dimensions * i);
 	    for(i=0;i<datapoints;i++)
-	    	for(j=0;j<DIMENSIONS;j++)
+	    	for(j=0;j<dimensions;j++)
 	    		fscanf(pointsFile, "%f", &X[i][j]);
-			Y = (float *)malloc(sizeof(float) * datapoints);
+		Y = (float *)malloc(sizeof(float) * datapoints);
 	    for(i=0;i<datapoints;i++)
 	    	fscanf(labelFile, "%f",&Y[i]);
 
@@ -167,19 +166,22 @@ int main(int argc, char *argv[]) {
 		startTime = monotonic_seconds();
 
 		pthread_t thread[no_threads];
-		int t;
-
-	    memset(w,0,sizeof(w));
+		int t;	    
 
 	    // Meaningful code
+	    noobColumnsMask = (int *)calloc(dimensions, sizeof(int));
+	    w_index = (int *)calloc(dimensions, sizeof(int));
 	    memset(noobColumnsMask,0,sizeof(noobColumnsMask));
 	    findNoobColumns(); // TODO: Can parallelize
 	    removeNoobColumns(); // TODO: Can parallelize
 
+	    // create and initialize 'w' with the effectine no of dimensions
+	    w = (float *)calloc(dimensions, sizeof(float));
+
 	    int iterations;
-			Xw = (float *)malloc(sizeof(float) * datapoints);
-			X2 = (float *)malloc(sizeof(float) * datapoints);
-			calcDenominator(); // TODO: Can parallelize
+		Xw = (float *)malloc(sizeof(float) * datapoints);
+		X2 = (float *)malloc(sizeof(float) * datapoints);
+		calcDenominator(); // TODO: Can parallelize
 	    calc_Xw(); // TODO: Can parallelize
 	    calc_Error(); // TODO: Can parallelize
 	    for(iterations=0; iterations<iter; iterations++) {
