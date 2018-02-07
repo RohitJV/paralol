@@ -5,7 +5,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
 
 // **************************************** Timer based methods BEGIN ****************************************
 
@@ -35,25 +34,17 @@ double startTime, endTime;
 
 // **************************************** Timer based methods END... ****************************************
 
-pthread_mutex_t mutexnum;
-
 float **X;//[15170][DIMENSIONS];
 float *Y;//[15170];
 float *w;
 
-int no_threads, iter, pointsPerThread;
+int no_threads, iter;
 int datapoints, dimensions;
 int *noobColumnsMask;
 int *w_index;
 float *Xw;//[15170];
 float *X2;
 //float* result;
-float error = 0.0, num = 0.0;
-
-struct capsule {
-	int startPosition;
-	int dimension;
-};
 
 void findNoobColumns() {
 	int i,j;
@@ -95,34 +86,14 @@ void update_Xw(int j, float val) {
 	}
 }
 
-void calcNumerator1(int j) {
+float calcNumerator(int j) {
 	float ret = 0.0, temp = 0.0;
 	int i;
 	for(i=0;i<datapoints;i++) {
 		temp = Y[i] - (Xw[i] - X[i][get(j)] * w[j]);
 		ret = ret + X[i][get(j)] * temp;
 	}
-	num = ret;
-}
-
-void* calcNumerator(void *c) {
-	int i;
-   	struct capsule *tempC = (struct capsule*)c;
-   	int startPosition = tempC->startPosition, j = tempC->dimension;
-   	float result = 0.0, temp = 0.0;
-   	//printf("Thread %ld starting...\n",startPosition);
-   	int endPosition = datapoints;
-   	if(startPosition+pointsPerThread < endPosition)
-   		endPosition=startPosition+pointsPerThread;
-   	for (i=startPosition; i<endPosition; i++) {
-   		temp = Y[i] - (Xw[i] - X[i][get(j)] * w[j]);
-		result = result + X[i][get(j)] * temp;			
-   	}
-   	pthread_mutex_lock (&mutexnum);
-   	num += result;   	
-   	pthread_mutex_unlock (&mutexnum);
-   	free(c);
-   	pthread_exit((void *) 0);
+	return ret;
 }
 
 void calcDenominator() {
@@ -189,8 +160,7 @@ int main(int argc, char *argv[]) {
 		startTime = monotonic_seconds();
 
 		pthread_t thread[no_threads];
-		pthread_mutex_init(&mutexnum, NULL);
-		int t, rc;	    
+		int t;	    
 
 	    // Meaningful code
 	    noobColumnsMask = (int *)calloc(dimensions, sizeof(int));
@@ -209,28 +179,15 @@ int main(int argc, char *argv[]) {
 	    calc_Xw(); // TODO: Can parallelize
 	    calc_Error(); // TODO: Must parallelize
 	    for(iterations=0; iterations<iter; iterations++) {
-	    	int dim;	    	
-	    	pointsPerThread = (datapoints+no_threads-1)/no_threads;
-	    	for(dim=0; dim<dimensions; dim++) {		
-	    		num = 0.0;		
-	    		//calcNumerator1(dim); // TODO: Must parallelize
-	    		for(t=0; t<no_threads; t++) {
-	    			struct capsule *c = malloc(sizeof(struct capsule));
-	    			c->dimension = dim;
-	    			c->startPosition = t * pointsPerThread;
-	    			rc = pthread_create(&thread[t], NULL, calcNumerator, (void *)c);
-	    			if (rc) {
-			        	//printf("ERROR; return code from pthread_create() is %d\n", rc);
-			         	exit(-1);
-			        }					        
-	    		}
-	    		for(t=0; t<no_threads; t++) {
-	    			pthread_join(thread[t], NULL);
-	    		}
+	    	int dim;
+	    	float temp[dimensions];
+	    	for(dim=0; dim<dimensions; dim++) {				
+	    		float num = calcNumerator(dim); // TODO: Must parallelize
 	    		float den = X2[dim];				
 	    		update_Xw(dim, num/den); // TODO: Must parallelize
 	    		w[dim] = num/den;
-	    	}	  
+	    	}
+	    	printf("\n");
 	    	calc_Error(); // TODO: Must parallelize
 	    }
 
@@ -238,7 +195,7 @@ int main(int argc, char *argv[]) {
 		fclose(pointsFile);
 		fclose(labelFile);
 
-		//printW();
+		printW();
 
 		// free em resources
 		free(X);
@@ -249,9 +206,5 @@ int main(int argc, char *argv[]) {
 	// **************************************** Timer stops ****************************************
 	endTime = monotonic_seconds();
 	print_time(endTime-startTime);
-	
-	pthread_mutex_destroy(&mutexnum);
-	pthread_exit(NULL);
-	
 	return 0;
 }

@@ -1,3 +1,3 @@
 default:
-	gcc lc_pthreads.c
-	./a.out data.csv data.label 10 2
+	gcc -pthread lc_pthreads.c
+	./a.out data2.csv data2.label 10 8
