@@ -47,6 +47,7 @@ int noobColumnsMask[DIMENSIONS];
 int w_index[DIMENSIONS];
 float *Xw;//[15170];
 float *X2;
+float* result;
 
 void findNoobColumns() {
 	int i,j;
@@ -88,15 +89,13 @@ void update_Xw(int j, float val) {
 	}
 }
 
-float* removeDimensionContribution(int j) {
-	float* ret = (float *) malloc(datapoints*sizeof(float));
+void removeDimensionContribution(int j) {
 	int i;
 	for(i=0;i<datapoints;i++)
-		ret[i] = Xw[i] - X[i][get(j)] * w[j];
-	return ret;
+		result[i] = Xw[i] - X[i][get(j)] * w[j];
 }
 
-void subtractY(float* result) {
+void subtractY() {
 	int i;
 	for(i=0;i<datapoints;i++)
 		result[i] = Y[i] - result[i];
@@ -142,65 +141,72 @@ int main(int argc, char *argv[]) {
 		FILE *labelFile = fopen( argv[2], "r" );
 		if(pointsFile == 0)
             printf( "Could not open datapoints file\n" );
-    if(labelFile == 0)
-            printf( "Could not open labels file\n" );
+	    if(labelFile == 0)
+	            printf( "Could not open labels file\n" );
 
-		iter = atoi(argv[3]);
-    no_threads = atoi(argv[4]);
+			iter = atoi(argv[3]);
+	    no_threads = atoi(argv[4]);
 
-   	fscanf(pointsFile, "%d %d", &datapoints, &dimensions);
-   	fscanf(labelFile, "%d", &datapoints);
+	   	fscanf(pointsFile, "%d %d", &datapoints, &dimensions);
+	   	fscanf(labelFile, "%d", &datapoints);
 
-   	// Initialize
-		int i,j;
-		//X = (float **)malloc(sizeof(float *)*datapoints);
-		//X[0] = (float *)malloc(sizeof(float) * datapoints * DIMENSIONS);
+	   	// Initialize
+		int i,j;		
 		X = (float **)malloc(datapoints * sizeof(float *));
 		X[0] = (float *)malloc(sizeof(float) * DIMENSIONS * datapoints);
-    for(i = 0; i < datapoints; i++)
-        X[i] = (*X + DIMENSIONS * i);
-    for(i=0;i<datapoints;i++)
-    	for(j=0;j<DIMENSIONS;j++)
-    		fscanf(pointsFile, "%f", &X[i][j]);
-		Y = (float *)malloc(sizeof(float) * datapoints);
-    for(i=0;i<datapoints;i++)
-    	fscanf(labelFile, "%f",&Y[i]);
+	    for(i = 0; i < datapoints; i++)
+	        X[i] = (*X + DIMENSIONS * i);
+	    for(i=0;i<datapoints;i++)
+	    	for(j=0;j<DIMENSIONS;j++)
+	    		fscanf(pointsFile, "%f", &X[i][j]);
+			Y = (float *)malloc(sizeof(float) * datapoints);
+	    for(i=0;i<datapoints;i++)
+	    	fscanf(labelFile, "%f",&Y[i]);
 
 		// **************************************** Timer starts ****************************************
 		startTime = monotonic_seconds();
 
-    memset(w,0,sizeof(w));
+		pthread_t thread[no_threads];
+		int t;
 
-    // Meaningful code
-    memset(noobColumnsMask,0,sizeof(noobColumnsMask));
-    findNoobColumns(); // TODO: Can parallelize
-    removeNoobColumns(); // TODO: Can parallelize
+	    memset(w,0,sizeof(w));
 
-    int iterations;
-		Xw = (float *)malloc(sizeof(float) * datapoints);
-		X2 = (float *)malloc(sizeof(float) * datapoints);
-		calcDenominator(); // TODO: Can parallelize
-    calc_Xw(); // TODO: Can parallelize
-    calc_Error(); // TODO: Can parallelize
-    for(iterations=0; iterations<iter; iterations++) {
-    	int dim;
-    	float temp[dimensions];
-    	for(dim=0; dim<dimensions; dim++) {
-    		float* result = removeDimensionContribution(dim); // TODO: Must parallelize
-    		subtractY(result); // TODO: Must parallelize
-    		float num = calcNumerator(dim, result); // TODO: Must parallelize
-    		float den = X2[dim];
+	    // Meaningful code
+	    memset(noobColumnsMask,0,sizeof(noobColumnsMask));
+	    findNoobColumns(); // TODO: Can parallelize
+	    removeNoobColumns(); // TODO: Can parallelize
+
+	    int iterations;
+			Xw = (float *)malloc(sizeof(float) * datapoints);
+			X2 = (float *)malloc(sizeof(float) * datapoints);
+			calcDenominator(); // TODO: Can parallelize
+	    calc_Xw(); // TODO: Can parallelize
+	    calc_Error(); // TODO: Can parallelize
+	    for(iterations=0; iterations<iter; iterations++) {
+	    	int dim;
+	    	float temp[dimensions];
+	    	for(dim=0; dim<dimensions; dim++) {
+				result = (float *)malloc(sizeof(float)*datapoints);
+	    		removeDimensionContribution(dim); // TODO: Must parallelize
+				// for(t=0;t<no_threads;t++) {
+				// 	pthread_create(&thread[t], &attr, BusyWork, (void *)t);
+				// }
+				subtractY(); // TODO: Must parallelize
+	    		float num = calcNumerator(dim, result); // TODO: Must parallelize
+	    		float den = X2[dim];
 				free(result);
-    		update_Xw(dim, num/den); // TODO: Must parallelize
-    		w[dim] = num/den;
-    	}
-    	printf("\n");
-    	calc_Error(); // TODO: Must parallelize
-    }
+	    		update_Xw(dim, num/den); // TODO: Must parallelize
+	    		w[dim] = num/den;
+	    	}
+	    	printf("\n");
+	    	calc_Error(); // TODO: Must parallelize
+	    }
 
-    // File I/O
+    	// File I/O
 		fclose(pointsFile);
 		fclose(labelFile);
+
+		//printW();
 
 		// free em resources
 		free(X);
