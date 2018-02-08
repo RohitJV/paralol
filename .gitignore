@@ -2,3 +2,8 @@
 *.exe
 *.out
 tutorial/trivial/*
+data2.csv
+data2.label
+data_large.csv
+data_large.label
+temp.c
