@@ -37,22 +37,22 @@ double startTime, endTime;
 
 pthread_mutex_t mutexnum;
 
-float **X;//[15170][DIMENSIONS];
-float *Y;//[15170];
-float *w;
+double **X;//[15170][DIMENSIONS];
+double *Y;//[15170];
+double *w;
 
 int no_threads, iter, pointsPerThread;
 int datapoints, dimensions;
 int *noobColumnsMask;
 int *w_index;
-float *Xw;//[15170];
-float *X2;
-float error = 0.0, num = 0.0;
+double *Xw;//[15170];
+double *X2;
+double error = 0.0, num = 0.0;
 
 struct capsule {
 	int startPosition;
 	int dimension;
-	float val;
+	double val;
 };
 
 void findNoobColumns() {
@@ -85,7 +85,7 @@ void* calc_Xw(void *t) {
    		endPosition=startPosition+pointsPerThread;
 	int i,j;	
 	for(i=startPosition;i<endPosition;i++) {
-		float temp = 0.0;
+		double temp = 0.0;
 		for(j=0;j<dimensions;j++) {
 			temp = temp + X[i][get(j)] * w[j];
 		}
@@ -98,7 +98,7 @@ void* update_Xw(void *c) {
 	int i;
    	struct capsule *tempC = (struct capsule*)c;
    	int startPosition = tempC->startPosition, j = tempC->dimension;
-   	float result = 0.0, temp = 0.0, val = tempC->val;
+   	double result = 0.0, temp = 0.0, val = tempC->val;
    	//printf("Thread %ld starting...\n",startPosition);
    	int endPosition = datapoints;
    	if(startPosition+pointsPerThread < endPosition)
@@ -114,7 +114,7 @@ void* calcNumerator(void *c) {
 	int i;
    	struct capsule *tempC = (struct capsule*)c;
    	int startPosition = tempC->startPosition, j = tempC->dimension;
-   	float result = 0.0, temp = 0.0;   	
+   	double result = 0.0, temp = 0.0;   	
    	int endPosition = datapoints;
    	if(startPosition+pointsPerThread < endPosition)
    		endPosition=startPosition+pointsPerThread;
@@ -132,9 +132,9 @@ void* calcNumerator(void *c) {
 void calcDenominator() {
 	int i,j;
 	for(j=0;j<dimensions;j++) {
-		float ret = 0.0;
+		double ret = 0.0;
 		for(i=0;i<datapoints;i++) {
-			float temp = X[i][get(j)];
+			double temp = X[i][get(j)];
 			ret = ret + temp * temp;
 		}
 		X2[j]=ret;
@@ -142,16 +142,16 @@ void calcDenominator() {
 }
 
 void* calc_Error(void *t) {
-	float ret = 0.0;
+	double ret = 0.0;
 	long startPosition = (long)t;
    	int endPosition = datapoints, i;
    	if(startPosition+pointsPerThread < endPosition)
    		endPosition=startPosition+pointsPerThread;	
 	for(i=startPosition;i<endPosition;i++) {
-		float temp = Xw[i] - Y[i];
+		double temp = Xw[i] - Y[i];
 		ret = ret + temp * temp;
 	}
-	pthread_mutex_lock (&mutexnum);   		
+	pthread_mutex_lock (&mutexnum); 	
 	error+=ret;
 	pthread_mutex_unlock (&mutexnum);
 	pthread_exit((void *) 0);	
@@ -184,16 +184,16 @@ int main(int argc, char *argv[]) {
 
 	   	// Initialize
 		int i,j;		
-		X = (float **)malloc(datapoints * sizeof(float *));
-		X[0] = (float *)malloc(sizeof(float) * dimensions * datapoints);
+		X = (double **)malloc(datapoints * sizeof(double *));
+		X[0] = (double *)malloc(sizeof(double) * dimensions * datapoints);
 	    for(i = 0; i < datapoints; i++)
 	        X[i] = (*X + dimensions * i);
 	    for(i=0;i<datapoints;i++)
 	    	for(j=0;j<dimensions;j++)
-	    		fscanf(pointsFile, "%f", &X[i][j]);
-		Y = (float *)malloc(sizeof(float) * datapoints);
+	    		fscanf(pointsFile, "%lf", &X[i][j]);
+		Y = (double *)malloc(sizeof(double) * datapoints);
 	    for(i=0;i<datapoints;i++)
-	    	fscanf(labelFile, "%f",&Y[i]);
+	    	fscanf(labelFile, "%lf",&Y[i]);
 
 		// **************************************** Timer starts ****************************************
 		startTime = monotonic_seconds();
@@ -215,10 +215,10 @@ int main(int argc, char *argv[]) {
 	    /*
 	     create and initialize 'w' with the effective no of dimensions
 	     */
-	    w = (float *)calloc(dimensions, sizeof(float));
+	    w = (double *)calloc(dimensions, sizeof(double));
 	    int iterations;
-		Xw = (float *)calloc(datapoints,sizeof(float));
-		X2 = (float *)calloc(datapoints,sizeof(float));
+		Xw = (double *)calloc(datapoints,sizeof(double));
+		X2 = (double *)calloc(datapoints,sizeof(double));
 				
 		pointsPerThread = (datapoints+no_threads-1)/no_threads;
 
@@ -232,7 +232,7 @@ int main(int argc, char *argv[]) {
 		Calculate Xw - parallelized
 		*/
 		for(t=0; t<no_threads; t++) {
-			rc = pthread_create(&thread[t], NULL, calc_Xw, (void *)(long)t);
+			rc = pthread_create(&thread[t], NULL, calc_Xw, (void *)(long)(t*pointsPerThread));
 			if (rc) {
 	        	printf("ERROR; return code from pthread_create() is %d\n", rc);
 	         	exit(-1);
@@ -247,7 +247,7 @@ int main(int argc, char *argv[]) {
 	    */	    
 	    error = 0.0;
 	    for(t=0; t<no_threads; t++) {
-			rc = pthread_create(&thread[t], NULL, calc_Error, (void *)(long)t);
+			rc = pthread_create(&thread[t], NULL, calc_Error, (void *)(long)(t*pointsPerThread));
 			if (rc) {
 	        	printf("ERROR; return code from pthread_create() is %d\n", rc);
 	         	exit(-1);
@@ -256,7 +256,7 @@ int main(int argc, char *argv[]) {
 		for(t=0; t<no_threads; t++) {
 			pthread_join(thread[t], NULL);
 		}	    
-		printf("Error : %f\n", error);	  			
+		printf("Initial Error : %lf\n", error);	  			
 
 		/*
 		Iterations
@@ -285,7 +285,7 @@ int main(int argc, char *argv[]) {
 	    		/*
 	    		 Get denominator
 	    		 */
-	    		float den = X2[dim];				
+	    		double den = X2[dim];				
 	    		
 	    		/*
 	    		 Update Xw
@@ -316,7 +316,7 @@ int main(int argc, char *argv[]) {
 	    	*/
 	    	error = 0.0;
 		    for(t=0; t<no_threads; t++) {
-				rc = pthread_create(&thread[t], NULL, calc_Error, (void *)(long)t);
+				rc = pthread_create(&thread[t], NULL, calc_Error, (void *)(long)(t*pointsPerThread));
 				if (rc) {
 		        	printf("ERROR; return code from pthread_create() is %d\n", rc);
 		         	exit(-1);
@@ -325,7 +325,7 @@ int main(int argc, char *argv[]) {
 			for(t=0; t<no_threads; t++) {
 				pthread_join(thread[t], NULL);
 			}	    
-			printf("Error : %f\n", error);			
+			printf("Error after iteration %d : %lf\n", iterations+1, error);			
 	    }
 
     	// File I/O
