@@ -114,8 +114,7 @@ void* calcNumerator(void *c) {
 	int i;
    	struct capsule *tempC = (struct capsule*)c;
    	int startPosition = tempC->startPosition, j = tempC->dimension;
-   	float result = 0.0, temp = 0.0;
-   	//printf("Thread %ld starting...\n",startPosition);
+   	float result = 0.0, temp = 0.0;   	
    	int endPosition = datapoints;
    	if(startPosition+pointsPerThread < endPosition)
    		endPosition=startPosition+pointsPerThread;
@@ -123,32 +122,23 @@ void* calcNumerator(void *c) {
    		temp = Y[i] - (Xw[i] - X[i][get(j)] * w[j]);
 		result = result + X[i][get(j)] * temp;			
    	}
-   	//printf("Thread %ld done. Result = %e\n",startPosition, result);
    	pthread_mutex_lock (&mutexnum);
    	num += result;
-   	// printf("Thread %ld did %d to %d:  mysum=%f global sum=%f\n",offset,start,end,mysum,dotstr.sum);
    	pthread_mutex_unlock (&mutexnum);
    	free(c);
    	pthread_exit((void *) 0);
 }
 
-void* calcDenominator(void *t) {
+void calcDenominator() {
 	int i,j;
-   	long startPosition = (long)t;
-   	int endPosition = datapoints;
-   	if(startPosition+pointsPerThread < endPosition)
-   		endPosition=startPosition+pointsPerThread;
-   	for(j=0;j<dimensions;j++) {
+	for(j=0;j<dimensions;j++) {
 		float ret = 0.0;
-	   	for (i=startPosition; i<endPosition; i++) {
-	   		float temp = X[i][get(j)];
+		for(i=0;i<datapoints;i++) {
+			float temp = X[i][get(j)];
 			ret = ret + temp * temp;
-	   	}
-	   	pthread_mutex_lock (&mutexnum);   		
-	   	X2[j]+=ret;
-	   	pthread_mutex_unlock (&mutexnum);
+		}
+		X2[j]=ret;
 	}
-	pthread_exit((void *) 0);
 }
 
 void* calc_Error(void *t) {
@@ -164,8 +154,7 @@ void* calc_Error(void *t) {
 	pthread_mutex_lock (&mutexnum);   		
 	error+=ret;
 	pthread_mutex_unlock (&mutexnum);
-	pthread_exit((void *) 0);
-	//printf("Error : %f\n", ret);
+	pthread_exit((void *) 0);	
 }
 
 void printW() {
@@ -215,46 +204,37 @@ int main(int argc, char *argv[]) {
 
 	    // Meaningful code
 	    noobColumnsMask = (int *)calloc(dimensions, sizeof(int));
-	    w_index = (int *)calloc(dimensions, sizeof(int));	    
-	    findNoobColumns(); // TODO: Can parallelize
-	    removeNoobColumns(); // TODO: Can parallelize
+	    w_index = (int *)calloc(dimensions, sizeof(int));
+
+	    /*
+	    Not parallelizing this part since this would lead to frequent Cache invalidation of noobColumsnMask[]
+	    */  
+	    findNoobColumns();
+	    removeNoobColumns();
 
 	    /*
 	     create and initialize 'w' with the effective no of dimensions
 	     */
 	    w = (float *)calloc(dimensions, sizeof(float));
-
 	    int iterations;
 		Xw = (float *)calloc(datapoints,sizeof(float));
 		X2 = (float *)calloc(datapoints,sizeof(float));
-		
-		/*
-		Proprocessing of Denominator
-		Calculate Xw
-		*/
+				
 		pointsPerThread = (datapoints+no_threads-1)/no_threads;
 
 		/*
 		Calculate Denominator terms
-		*/
-		for(t=0; t<no_threads; t++) {
-			rc = pthread_create(&thread[t], NULL, calcDenominator, (void *)(long)t);
-			if (rc) {
-	        	//printf("ERROR; return code from pthread_create() is %d\n", rc);
-	         	exit(-1);
-	        }					        
-		}
-		for(t=0; t<no_threads; t++) {
-			pthread_join(thread[t], NULL);
-		}
+		Not parallelizing this part since this would lead to frequent Cache invalidation of X2[]
+		*/		
+		calcDenominator();
 
 		/*
-		Calculate Xw
+		Calculate Xw - parallelized
 		*/
 		for(t=0; t<no_threads; t++) {
 			rc = pthread_create(&thread[t], NULL, calc_Xw, (void *)(long)t);
 			if (rc) {
-	        	//printf("ERROR; return code from pthread_create() is %d\n", rc);
+	        	printf("ERROR; return code from pthread_create() is %d\n", rc);
 	         	exit(-1);
 	        }					        
 		}
@@ -263,7 +243,7 @@ int main(int argc, char *argv[]) {
 		}	    
 
 	    /* 
-	    Calculate Initial Error
+	    Calculate Initial Error - parallelized
 	    */	    
 	    error = 0.0;
 	    for(t=0; t<no_threads; t++) {
@@ -276,8 +256,7 @@ int main(int argc, char *argv[]) {
 		for(t=0; t<no_threads; t++) {
 			pthread_join(thread[t], NULL);
 		}	    
-		printf("Error : %f\n", error);	  
-		//calc_Error1();		
+		printf("Error : %f\n", error);	  			
 
 		/*
 		Iterations
@@ -346,7 +325,7 @@ int main(int argc, char *argv[]) {
 			for(t=0; t<no_threads; t++) {
 				pthread_join(thread[t], NULL);
 			}	    
-			printf("Error : %f\n", error);
+			printf("Error : %f\n", error);			
 	    }
 
     	// File I/O
