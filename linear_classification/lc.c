@@ -175,7 +175,8 @@ int main(int argc, char *argv[]) {
 	    int iterations;
 		Xw = (float *)malloc(sizeof(float) * datapoints);
 		X2 = (float *)malloc(sizeof(float) * datapoints);
-		calcDenominator(); // TODO: Can parallelize
+		calcDenominator(); // TODO: Can parallelize		
+
 	    calc_Xw(); // TODO: Can parallelize
 	    calc_Error(); // TODO: Must parallelize
 	    for(iterations=0; iterations<iter; iterations++) {
@@ -195,7 +196,7 @@ int main(int argc, char *argv[]) {
 		fclose(pointsFile);
 		fclose(labelFile);
 
-		printW();
+		//printW();
 
 		// free em resources
 		free(X);

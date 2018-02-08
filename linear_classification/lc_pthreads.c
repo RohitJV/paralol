@@ -47,12 +47,12 @@ int *noobColumnsMask;
 int *w_index;
 float *Xw;//[15170];
 float *X2;
-//float* result;
 float error = 0.0, num = 0.0;
 
 struct capsule {
 	int startPosition;
 	int dimension;
+	float val;
 };
 
 void findNoobColumns() {
@@ -78,31 +78,36 @@ int get(int idx) {
 	return w_index[idx];
 }
 
-void calc_Xw() {
-	int i,j;
-	memset(Xw,0, sizeof(Xw));
-	for(i=0;i<datapoints;i++) {
+void* calc_Xw(void *t) {
+	long startPosition = (long)t;
+	int endPosition = datapoints;
+   	if(startPosition+pointsPerThread < endPosition)
+   		endPosition=startPosition+pointsPerThread;
+	int i,j;	
+	for(i=startPosition;i<endPosition;i++) {
+		float temp = 0.0;
 		for(j=0;j<dimensions;j++) {
-			Xw[i] = Xw[i] + X[i][get(j)] * w[j];
+			temp = temp + X[i][get(j)] * w[j];
 		}
+		Xw[i]=temp;
 	}
+	pthread_exit((void *) 0);
 }
 
-void update_Xw(int j, float val) {
+void* update_Xw(void *c) {
 	int i;
-	for(i=0;i<datapoints;i++) {
-		Xw[i] = Xw[i] + X[i][get(j)] * (val - w[j]);
-	}
-}
-
-void calcNumerator1(int j) {
-	float ret = 0.0, temp = 0.0;
-	int i;
-	for(i=0;i<datapoints;i++) {
-		temp = Y[i] - (Xw[i] - X[i][get(j)] * w[j]);
-		ret = ret + X[i][get(j)] * temp;
-	}
-	num = ret;
+   	struct capsule *tempC = (struct capsule*)c;
+   	int startPosition = tempC->startPosition, j = tempC->dimension;
+   	float result = 0.0, temp = 0.0, val = tempC->val;
+   	//printf("Thread %ld starting...\n",startPosition);
+   	int endPosition = datapoints;
+   	if(startPosition+pointsPerThread < endPosition)
+   		endPosition=startPosition+pointsPerThread;
+   	for (i=startPosition; i<endPosition; i++) {
+   		Xw[i] = Xw[i] + X[i][get(j)] * (val - w[j]);
+   	}
+   	free(c);
+   	pthread_exit((void *) 0);
 }
 
 void* calcNumerator(void *c) {
@@ -127,26 +132,40 @@ void* calcNumerator(void *c) {
    	pthread_exit((void *) 0);
 }
 
-void calcDenominator() {
+void* calcDenominator(void *t) {
 	int i,j;
-	for(j=0;j<dimensions;j++) {
+   	long startPosition = (long)t;
+   	int endPosition = datapoints;
+   	if(startPosition+pointsPerThread < endPosition)
+   		endPosition=startPosition+pointsPerThread;
+   	for(j=0;j<dimensions;j++) {
 		float ret = 0.0;
-		for(i=0;i<datapoints;i++) {
-			float temp = X[i][get(j)];
+	   	for (i=startPosition; i<endPosition; i++) {
+	   		float temp = X[i][get(j)];
 			ret = ret + temp * temp;
-		}
-		X2[j]=ret;
+	   	}
+	   	pthread_mutex_lock (&mutexnum);   		
+	   	X2[j]+=ret;
+	   	pthread_mutex_unlock (&mutexnum);
 	}
+	pthread_exit((void *) 0);
 }
 
-void calc_Error() {
+void* calc_Error(void *t) {
 	float ret = 0.0;
-	int i;
-	for(i=0;i<datapoints;i++) {
+	long startPosition = (long)t;
+   	int endPosition = datapoints, i;
+   	if(startPosition+pointsPerThread < endPosition)
+   		endPosition=startPosition+pointsPerThread;	
+	for(i=startPosition;i<endPosition;i++) {
 		float temp = Xw[i] - Y[i];
 		ret = ret + temp * temp;
 	}
-	printf("Error : %f\n", ret);
+	pthread_mutex_lock (&mutexnum);   		
+	error+=ret;
+	pthread_mutex_unlock (&mutexnum);
+	pthread_exit((void *) 0);
+	//printf("Error : %f\n", ret);
 }
 
 void printW() {
@@ -196,24 +215,79 @@ int main(int argc, char *argv[]) {
 
 	    // Meaningful code
 	    noobColumnsMask = (int *)calloc(dimensions, sizeof(int));
-	    w_index = (int *)calloc(dimensions, sizeof(int));
-	    memset(noobColumnsMask,0,sizeof(noobColumnsMask));
+	    w_index = (int *)calloc(dimensions, sizeof(int));	    
 	    findNoobColumns(); // TODO: Can parallelize
 	    removeNoobColumns(); // TODO: Can parallelize
 
-	    // create and initialize 'w' with the effectine no of dimensions
+	    /*
+	     create and initialize 'w' with the effective no of dimensions
+	     */
 	    w = (float *)calloc(dimensions, sizeof(float));
 
 	    int iterations;
-		Xw = (float *)malloc(sizeof(float) * datapoints);
-		X2 = (float *)malloc(sizeof(float) * datapoints);
-		calcDenominator(); // TODO: Can parallelize
-	    calc_Xw(); // TODO: Can parallelize
-	    calc_Error(); // TODO: Must parallelize
+		Xw = (float *)calloc(datapoints,sizeof(float));
+		X2 = (float *)calloc(datapoints,sizeof(float));
+		
+		/*
+		Proprocessing of Denominator
+		Calculate Xw
+		*/
+		pointsPerThread = (datapoints+no_threads-1)/no_threads;
+
+		/*
+		Calculate Denominator terms
+		*/
+		for(t=0; t<no_threads; t++) {
+			rc = pthread_create(&thread[t], NULL, calcDenominator, (void *)(long)t);
+			if (rc) {
+	        	//printf("ERROR; return code from pthread_create() is %d\n", rc);
+	         	exit(-1);
+	        }					        
+		}
+		for(t=0; t<no_threads; t++) {
+			pthread_join(thread[t], NULL);
+		}
+
+		/*
+		Calculate Xw
+		*/
+		for(t=0; t<no_threads; t++) {
+			rc = pthread_create(&thread[t], NULL, calc_Xw, (void *)(long)t);
+			if (rc) {
+	        	//printf("ERROR; return code from pthread_create() is %d\n", rc);
+	         	exit(-1);
+	        }					        
+		}
+		for(t=0; t<no_threads; t++) {
+			pthread_join(thread[t], NULL);
+		}	    
+
+	    /* 
+	    Calculate Initial Error
+	    */	    
+	    error = 0.0;
+	    for(t=0; t<no_threads; t++) {
+			rc = pthread_create(&thread[t], NULL, calc_Error, (void *)(long)t);
+			if (rc) {
+	        	printf("ERROR; return code from pthread_create() is %d\n", rc);
+	         	exit(-1);
+	        }					        
+		}
+		for(t=0; t<no_threads; t++) {
+			pthread_join(thread[t], NULL);
+		}	    
+		printf("Error : %f\n", error);	  
+		//calc_Error1();		
+
+		/*
+		Iterations
+		*/
 	    for(iterations=0; iterations<iter; iterations++) {
-	    	int dim;	    	
-	    	pointsPerThread = (datapoints+no_threads-1)/no_threads;
+	    	int dim;	    		    	
 	    	for(dim=0; dim<dimensions; dim++) {		
+	    		/*
+	    		 Calculate Numerator
+	    		 */
 	    		num = 0.0;		
 	    		for(t=0; t<no_threads; t++) {
 	    			struct capsule *c = malloc(sizeof(struct capsule));
@@ -221,18 +295,58 @@ int main(int argc, char *argv[]) {
 	    			c->startPosition = t * pointsPerThread;
 	    			rc = pthread_create(&thread[t], NULL, calcNumerator, (void *)c);
 	    			if (rc) {
-			        	//printf("ERROR; return code from pthread_create() is %d\n", rc);
+			        	printf("ERROR; return code from pthread_create() is %d\n", rc);
 			         	exit(-1);
 			        }					        
 	    		}
 	    		for(t=0; t<no_threads; t++) {
 	    			pthread_join(thread[t], NULL);
 	    		}
+
+	    		/*
+	    		 Get denominator
+	    		 */
 	    		float den = X2[dim];				
-	    		update_Xw(dim, num/den); // TODO: Must parallelize
+	    		
+	    		/*
+	    		 Update Xw
+	    		 */
+	    		//update_Xw(dim, num/den); // TODO: Must parallelize
+	    		for(t=0; t<no_threads; t++) {
+	    			struct capsule *c = malloc(sizeof(struct capsule));
+	    			c->dimension = dim;
+	    			c->startPosition = t * pointsPerThread;
+	    			c->val = num/den;
+	    			rc = pthread_create(&thread[t], NULL, update_Xw, (void *)c);
+	    			if (rc) {
+			        	printf("ERROR; return code from pthread_create() is %d\n", rc);
+			         	exit(-1);
+			        }					        
+	    		}
+	    		for(t=0; t<no_threads; t++) {
+	    			pthread_join(thread[t], NULL);
+	    		}
+	    		
+	    		/*
+	    		Update the new wi
+	    		*/
 	    		w[dim] = num/den;
 	    	}	  
-	    	calc_Error(); // TODO: Must parallelize
+	    	/*
+			Update Error
+	    	*/
+	    	error = 0.0;
+		    for(t=0; t<no_threads; t++) {
+				rc = pthread_create(&thread[t], NULL, calc_Error, (void *)(long)t);
+				if (rc) {
+		        	printf("ERROR; return code from pthread_create() is %d\n", rc);
+		         	exit(-1);
+		        }					        
+			}
+			for(t=0; t<no_threads; t++) {
+				pthread_join(thread[t], NULL);
+			}	    
+			printf("Error : %f\n", error);
 	    }
 
     	// File I/O
