@@ -78,7 +78,7 @@ int get(int idx) {
 	return w_index[idx];
 }
 
-void* calc_Xw(void *t) {
+void* calcXw(void *t) {
 	long startPosition = (long)t;
 	int endPosition = datapoints;
    	if(startPosition+pointsPerThread < endPosition)
@@ -94,7 +94,7 @@ void* calc_Xw(void *t) {
 	pthread_exit((void *) 0);
 }
 
-void* update_Xw(void *c) {
+void* updateXw(void *c) {
 	int i;
    	struct capsule *tempC = (struct capsule*)c;
    	int startPosition = tempC->startPosition, j = tempC->dimension;
@@ -141,7 +141,7 @@ void calcDenominator() {
 	}
 }
 
-void* calc_Error(void *t) {
+void* calcError(void *t) {
 	double ret = 0.0;
 	long startPosition = (long)t;
    	int endPosition = datapoints, i;
@@ -232,7 +232,7 @@ int main(int argc, char *argv[]) {
 		Calculate Xw - parallelized
 		*/
 		for(t=0; t<no_threads; t++) {
-			rc = pthread_create(&thread[t], NULL, calc_Xw, (void *)(long)(t*pointsPerThread));
+			rc = pthread_create(&thread[t], NULL, calcXw, (void *)(long)(t*pointsPerThread));
 			if (rc) {
 	        	printf("ERROR; return code from pthread_create() is %d\n", rc);
 	         	exit(-1);
@@ -247,7 +247,7 @@ int main(int argc, char *argv[]) {
 	    */	    
 	    error = 0.0;
 	    for(t=0; t<no_threads; t++) {
-			rc = pthread_create(&thread[t], NULL, calc_Error, (void *)(long)(t*pointsPerThread));
+			rc = pthread_create(&thread[t], NULL, calcError, (void *)(long)(t*pointsPerThread));
 			if (rc) {
 	        	printf("ERROR; return code from pthread_create() is %d\n", rc);
 	         	exit(-1);
@@ -290,13 +290,13 @@ int main(int argc, char *argv[]) {
 	    		/*
 	    		 Update Xw
 	    		 */
-	    		//update_Xw(dim, num/den); // TODO: Must parallelize
+	    		//updateXw(dim, num/den); // TODO: Must parallelize
 	    		for(t=0; t<no_threads; t++) {
 	    			struct capsule *c = malloc(sizeof(struct capsule));
 	    			c->dimension = dim;
 	    			c->startPosition = t * pointsPerThread;
 	    			c->val = num/den;
-	    			rc = pthread_create(&thread[t], NULL, update_Xw, (void *)c);
+	    			rc = pthread_create(&thread[t], NULL, updateXw, (void *)c);
 	    			if (rc) {
 			        	printf("ERROR; return code from pthread_create() is %d\n", rc);
 			         	exit(-1);
@@ -316,7 +316,7 @@ int main(int argc, char *argv[]) {
 	    	*/
 	    	error = 0.0;
 		    for(t=0; t<no_threads; t++) {
-				rc = pthread_create(&thread[t], NULL, calc_Error, (void *)(long)(t*pointsPerThread));
+				rc = pthread_create(&thread[t], NULL, calcError, (void *)(long)(t*pointsPerThread));
 				if (rc) {
 		        	printf("ERROR; return code from pthread_create() is %d\n", rc);
 		         	exit(-1);
