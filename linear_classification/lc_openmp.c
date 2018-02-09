@@ -241,8 +241,7 @@ int main(int argc, char *argv[]) {
 	    	/*
 			Update Error
 	    	*/
-	    	calc_Error();	
-	    	print_time(monotonic_seconds()-startTime);
+	    	calc_Error();		    	
 	    }
 
     	// File I/O
