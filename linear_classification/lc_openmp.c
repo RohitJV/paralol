@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "omp.h"
 
 // **************************************** Timer based methods BEGIN ****************************************
 
@@ -78,55 +79,33 @@ int get(int idx) {
 	return w_index[idx];
 }
 
-void* calc_Xw(void *t) {
-	long startPosition = (long)t;
-	int endPosition = datapoints;
-   	if(startPosition+pointsPerThread < endPosition)
-   		endPosition=startPosition+pointsPerThread;
-	int i,j;	
-	for(i=startPosition;i<endPosition;i++) {
-		double temp = 0.0;
-		for(j=0;j<dimensions;j++) {
-			temp = temp + X[i][get(j)] * w[j];
+void calc_Xw() {
+	int i,j;		
+	#pragma omp parallel for private(i,j) num_threads(no_threads)
+	for(i=0; i<datapoints; i++) {
+		for(j=0; j<dimensions; j++) {
+			Xw[i] = Xw[i] + X[i][get(j)] * w[j];
 		}
-		Xw[i]=temp;
+	}	
+}
+
+void update_Xw(int j, double val) {
+	int i=0;
+	#pragma omp parallel for num_threads(no_threads)
+	for(i=0;i<datapoints;i++) {
+		Xw[i] = Xw[i] + X[i][get(j)] * (val - w[j]);
 	}
-	pthread_exit((void *) 0);
 }
 
-void* update_Xw(void *c) {
-	int i;
-   	struct capsule *tempC = (struct capsule*)c;
-   	int startPosition = tempC->startPosition, j = tempC->dimension;
-   	double result = 0.0, temp = 0.0, val = tempC->val;
-   	//printf("Thread %ld starting...\n",startPosition);
-   	int endPosition = datapoints;
-   	if(startPosition+pointsPerThread < endPosition)
-   		endPosition=startPosition+pointsPerThread;
-   	for (i=startPosition; i<endPosition; i++) {
-   		Xw[i] = Xw[i] + X[i][get(j)] * (val - w[j]);
-   	}
-   	free(c);
-   	pthread_exit((void *) 0);
-}
-
-void* calcNumerator(void *c) {
-	int i;
-   	struct capsule *tempC = (struct capsule*)c;
-   	int startPosition = tempC->startPosition, j = tempC->dimension;
-   	double result = 0.0, temp = 0.0;   	
-   	int endPosition = datapoints;
-   	if(startPosition+pointsPerThread < endPosition)
-   		endPosition=startPosition+pointsPerThread;
-   	for (i=startPosition; i<endPosition; i++) {
-   		temp = Y[i] - (Xw[i] - X[i][get(j)] * w[j]);
-		result = result + X[i][get(j)] * temp;			
-   	}
-   	pthread_mutex_lock (&mutexnum);
-   	num += result;
-   	pthread_mutex_unlock (&mutexnum);
-   	free(c);
-   	pthread_exit((void *) 0);
+double calcNumerator(int j) {
+	int i=0;	
+	double ret = 0.0, temp = 0.0;
+	#pragma omp parallel for reduction(+: ret) private(temp) num_threads(no_threads)
+	for(i=0; i<datapoints; i++) {
+		temp = Y[i] - (Xw[i] - X[i][get(j)] * w[j]);
+		ret = ret + X[i][get(j)] * temp;
+	}	
+	return ret;
 }
 
 void calcDenominator() {
@@ -141,20 +120,15 @@ void calcDenominator() {
 	}
 }
 
-void* calc_Error(void *t) {
-	double ret = 0.0;
-	long startPosition = (long)t;
-   	int endPosition = datapoints, i;
-   	if(startPosition+pointsPerThread < endPosition)
-   		endPosition=startPosition+pointsPerThread;	
-	for(i=startPosition;i<endPosition;i++) {
-		double temp = Xw[i] - Y[i];
+void calc_Error() {
+	double ret = 0.0, temp = 0.0;
+	int i;
+	#pragma omp parallel for reduction(+: ret) private(temp) num_threads(no_threads)
+	for(i=0;i<datapoints;i++) {
+		temp = Xw[i] - Y[i];
 		ret = ret + temp * temp;
 	}
-	pthread_mutex_lock (&mutexnum); 	
-	error+=ret;
-	pthread_mutex_unlock (&mutexnum);
-	pthread_exit((void *) 0);	
+	printf("Error : %lf\n", ret);
 }
 
 void printW() {
@@ -231,56 +205,23 @@ int main(int argc, char *argv[]) {
 		/*
 		Calculate Xw - parallelized
 		*/
-		for(t=0; t<no_threads; t++) {
-			rc = pthread_create(&thread[t], NULL, calc_Xw, (void *)(long)(t*pointsPerThread));
-			if (rc) {
-	        	printf("ERROR; return code from pthread_create() is %d\n", rc);
-	         	exit(-1);
-	        }					        
-		}
-		for(t=0; t<no_threads; t++) {
-			pthread_join(thread[t], NULL);
-		}	    
+		calc_Xw();
 
 	    /* 
 	    Calculate Initial Error - parallelized
 	    */	    
-	    error = 0.0;
-	    for(t=0; t<no_threads; t++) {
-			rc = pthread_create(&thread[t], NULL, calc_Error, (void *)(long)(t*pointsPerThread));
-			if (rc) {
-	        	printf("ERROR; return code from pthread_create() is %d\n", rc);
-	         	exit(-1);
-	        }					        
-		}
-		for(t=0; t<no_threads; t++) {
-			pthread_join(thread[t], NULL);
-		}	    
-		printf("Initial Error : %lf\n", error);	  			
+	    calc_Error(); 			
 
 		/*
 		Iterations
 		*/
 	    for(iterations=0; iterations<iter; iterations++) {
-	    	int dim;	   	    		    
+	    	int dim;	    		    		    
 	    	for(dim=0; dim<dimensions; dim++) {		
 	    		/*
 	    		 Calculate Numerator
 	    		 */
-	    		num = 0.0;		
-	    		for(t=0; t<no_threads; t++) {
-	    			struct capsule *c = malloc(sizeof(struct capsule));
-	    			c->dimension = dim;
-	    			c->startPosition = t * pointsPerThread;
-	    			rc = pthread_create(&thread[t], NULL, calcNumerator, (void *)c);
-	    			if (rc) {
-			        	printf("ERROR; return code from pthread_create() is %d\n", rc);
-			         	exit(-1);
-			        }					        
-	    		}
-	    		for(t=0; t<no_threads; t++) {
-	    			pthread_join(thread[t], NULL);
-	    		}
+	    		num = calcNumerator(dim);
 
 	    		/*
 	    		 Get denominator
@@ -290,21 +231,7 @@ int main(int argc, char *argv[]) {
 	    		/*
 	    		 Update Xw
 	    		 */
-	    		//update_Xw(dim, num/den); // TODO: Must parallelize
-	    		for(t=0; t<no_threads; t++) {
-	    			struct capsule *c = malloc(sizeof(struct capsule));
-	    			c->dimension = dim;
-	    			c->startPosition = t * pointsPerThread;
-	    			c->val = num/den;
-	    			rc = pthread_create(&thread[t], NULL, update_Xw, (void *)c);
-	    			if (rc) {
-			        	printf("ERROR; return code from pthread_create() is %d\n", rc);
-			         	exit(-1);
-			        }					        
-	    		}
-	    		for(t=0; t<no_threads; t++) {
-	    			pthread_join(thread[t], NULL);
-	    		}
+	    		update_Xw(dim, num/den); // TODO: Must parallelize
 	    		
 	    		/*
 	    		Update the new wi
@@ -314,18 +241,8 @@ int main(int argc, char *argv[]) {
 	    	/*
 			Update Error
 	    	*/
-	    	error = 0.0;
-		    for(t=0; t<no_threads; t++) {
-				rc = pthread_create(&thread[t], NULL, calc_Error, (void *)(long)(t*pointsPerThread));
-				if (rc) {
-		        	printf("ERROR; return code from pthread_create() is %d\n", rc);
-		         	exit(-1);
-		        }					        
-			}
-			for(t=0; t<no_threads; t++) {
-				pthread_join(thread[t], NULL);
-			}	    
-			printf("Error after iteration %d : %lf\n", iterations+1, error);			
+	    	calc_Error();	
+	    	print_time(monotonic_seconds()-startTime);
 	    }
 
     	// File I/O

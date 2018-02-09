@@ -190,6 +190,8 @@ int main(int argc, char *argv[]) {
 	    	}
 	    	printf("\n");
 	    	calc_Error(); // TODO: Must parallelize
+	    	
+	    	print_time(monotonic_seconds()-startTime);
 	    }
 
     	// File I/O
