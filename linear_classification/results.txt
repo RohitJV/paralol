@@ -1,0 +1,4 @@
+gcc -pthread lc_pthreads.c -o lc_pthreads
+gcc -fopenmp lc_openmp.c -o lc_openmp
+./lc_pthreads data_large.csv data_large.label 10 1
+Makefile:2: recipe for target 'default' failed
