@@ -305,6 +305,12 @@ int main(int argc, char *argv[]) {
 	MPI_Comm_size(MPI_COMM_WORLD, &total_no_proc);
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank_of_the_proc);
 
+  char proc_name[total_no_proc];
+  int name_len;
+  MPI_Get_processor_name(proc_name, &name_len);
+  printf("Hello World from processor %d out of %d, executing on %s\n",
+        rank_of_the_proc, total_no_proc, proc_name);
+
 	total_no_of_elements = atoi(argv[1]);
 	no_of_elements_per_proc = total_no_of_elements / total_no_proc;
 
