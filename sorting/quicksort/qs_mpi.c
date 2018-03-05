@@ -82,6 +82,11 @@ uint32_t _floor(double x) {
 		return (uint32_t)x;
 }
 
+uint32_t _min(uint32_t x, uint32_t y) {
+	if(x<y) return x;
+	return y;
+}
+
 int cmpfunc (const void * a, const void * b) {
    return ( *(uint32_t*)a > *(uint32_t*)b ? 1 : -1);
 }
@@ -150,7 +155,7 @@ uint32_t calc_division_of_proc(uint32_t lesser_count, uint32_t greater_count, ui
 	return ret;
 }
 
-double quicksort(MPI_Comm comm, uint32_t* a, uint32_t no_of_elements_for_proc, uint32_t total_no_proc, char* filename) {
+double quicksort(MPI_Comm comm, uint32_t* a, uint32_t no_of_elements_for_proc, uint32_t total_no_proc, uint32_t total_element_count, char* filename) {
 	uint32_t size_of_the_comm, rank_of_the_proc;
 	MPI_Comm_size(comm, &size_of_the_comm);
 	MPI_Comm_rank(comm, &rank_of_the_proc);
@@ -158,53 +163,86 @@ double quicksort(MPI_Comm comm, uint32_t* a, uint32_t no_of_elements_for_proc, u
 	/*
 	If this is the only process in the communicator, 
 	1. Just perform a local quicksort
-	2. Return the time after completion - endTime
+	2. Distrbute all elements equally
+	3. Collect everything at the last processor in MPI_COMM_WORLD
+	4. Print to output file
+	5. Return the time after completion - endTime
 	*/
 	if(size_of_the_comm == 1) {
 		qsort(a, no_of_elements_for_proc, sizeof(uint32_t), cmpfunc);
 		uint32_t proc_size, proc_rank;
 		MPI_Comm_size(MPI_COMM_WORLD, &proc_size);
 		MPI_Comm_rank(MPI_COMM_WORLD, &proc_rank);
-		uint32_t *rec_cnt, *rec_displs;
-		if(proc_rank == proc_size-1)  {
-			rec_cnt = (uint32_t*)malloc(sizeof(uint32_t) * total_no_proc);
-			rec_displs = (uint32_t*)malloc(sizeof(uint32_t) * total_no_proc);
-		}
 
 		/*
-		1. Gather the total number of elements each proccesor should receive from each other processor.
-		2. Set rdispls values based on this for the last processor in MPI_COMM_WORLD
+		Distribute elements evenly across all processors
 		*/
-		MPI_Gather((void*)&no_of_elements_for_proc, 1, MPI_UNSIGNED, (void*)rec_cnt, 1, MPI_UNSIGNED, proc_size-1, MPI_COMM_WORLD);
-		uint32_t total_cnt = 0;
-		if(proc_rank == proc_size-1) {
-			uint32_t i;
-			for(i=0; i<total_no_proc; i++) {
-				rec_displs[i] = total_cnt;
-				total_cnt = total_cnt + rec_cnt[i];
-			}
+		uint32_t i;
+		uint32_t cumulative_no_of_elements, cumulative_no_of_elements_exclusive, no_of_elements_per_proc = total_element_count / total_no_proc;
+		MPI_Scan((void*)&no_of_elements_for_proc, (void*)&cumulative_no_of_elements, 1, MPI_UNSIGNED, MPI_SUM, MPI_COMM_WORLD);
+		cumulative_no_of_elements_exclusive = cumulative_no_of_elements - no_of_elements_for_proc;
+		uint32_t startPosition = 0;
+		uint32_t *send_count = calloc(total_no_proc, sizeof(uint32_t));
+		uint32_t *receive_count = malloc(total_no_proc * sizeof(uint32_t));
+		uint32_t *send_displs = calloc(total_no_proc, sizeof(uint32_t));
+		uint32_t *receive_displs = calloc(total_no_proc, sizeof(uint32_t));
+		for(i=0; i<total_no_proc; i++) {
+			uint32_t lower_bound = i*no_of_elements_per_proc, upper_bound = (i+1)*no_of_elements_per_proc;
+			uint32_t cur_position = cumulative_no_of_elements_exclusive + startPosition;
+			send_displs[i] = startPosition;
+			if(startPosition<no_of_elements_for_proc && (cur_position>=lower_bound && cur_position<upper_bound))
+				send_count[i] = _min(upper_bound - cur_position, cumulative_no_of_elements - cur_position);
+			else
+				send_count[i] = 0;
+			startPosition = startPosition + send_count[i];
 		}
+		uint32_t total_rec_cnt = 0;
+		MPI_Alltoall( (void*)send_count, 1, MPI_UNSIGNED, (void*)receive_count, 1, MPI_UNSIGNED, MPI_COMM_WORLD);
+		for(i=0; i<total_no_proc; i++) {
+			total_rec_cnt = total_rec_cnt + receive_count[i];
+			if(i!=0)
+				receive_displs[i] = receive_displs[i-1] + receive_count[i-1];
+		}
+		uint32_t *result_evenly_distributed = malloc(sizeof(uint32_t) * total_rec_cnt);
+		MPI_Alltoallv( (void*)a, (void*)send_count, (void*)send_displs, MPI_UNSIGNED,  (void*)result_evenly_distributed, (void*)receive_count, (void*)receive_displs, MPI_UNSIGNED, MPI_COMM_WORLD);
+		free(a);
 
 		/*
-		1. Gather all the sorteed elements in the last processor og MPI_COMM_WORLD
-		2. Print to file
+		Step 2 of the algorithm completed.
+		Calculate endTime.
 		*/
-		uint32_t* result;
-    	if(proc_rank == proc_size-1)
-      		result = (uint32_t*)malloc(sizeof(uint32_t) * total_cnt);
-		MPI_Gatherv( (void*)a, no_of_elements_for_proc, MPI_UNSIGNED, (void*)result, rec_cnt, rec_displs, MPI_UNSIGNED, proc_size-1, MPI_COMM_WORLD);
-
 		double endTime = monotonic_seconds();
 
 		/*
+		1. Gather all the sorted elements in the last processor og MPI_COMM_WORLD
+		2. Print to file
+		*/
+		uint32_t *rec_cnt, *rec_displs, *result;
+		if(proc_rank == proc_size-1)  {
+			rec_cnt = (uint32_t*)malloc(sizeof(uint32_t) * total_no_proc);
+			rec_displs = (uint32_t*)malloc(sizeof(uint32_t) * total_no_proc);		
+			for(i=0; i<total_no_proc; i++) {
+				rec_cnt[i] = no_of_elements_per_proc;
+				rec_displs[i] = no_of_elements_per_proc*i;
+			}
+			result = (uint32_t*)malloc(sizeof(uint32_t) * total_element_count);
+		}
+		MPI_Gatherv( (void*)result_evenly_distributed, no_of_elements_per_proc, MPI_UNSIGNED, (void*)result, rec_cnt, rec_displs, MPI_UNSIGNED, proc_size-1, MPI_COMM_WORLD);
+		if(proc_rank == proc_size-1)
+			print_numbers(filename, result, total_element_count);
+		
+		/*
 		Check correctness
 		*/
-		uint32_t i;
-		for(i=1;i<total_cnt;i++) {
-			if(result[i]<result[i-1])
-				printf("NOT Sorted\n");
-		}
-    	print_numbers(filename, result, total_cnt);
+		#if TEST
+			if(proc_rank == proc_size-1) {
+				for(i=1;i<total_element_count;i++) {
+					if(result[i]<result[i-1])
+						printf("NOT Sorted\n");
+				}
+			}
+		#endif
+
 		return endTime;
 	}
 
@@ -232,7 +270,7 @@ double quicksort(MPI_Comm comm, uint32_t* a, uint32_t no_of_elements_for_proc, u
 		counts[1] = greater_count_cumulative;
 		/* If no progress, repeat again */
 		if(counts[0]==0 || counts[1]==0)
-			return quicksort(comm, a, no_of_elements_for_proc, total_no_proc, filename);
+			return quicksort(comm, a, no_of_elements_for_proc, total_no_proc, total_element_count, filename);
 	}
 	MPI_Bcast( (void*)counts, 2, MPI_UNSIGNED, size_of_the_comm-1, comm );
 
@@ -302,12 +340,12 @@ double quicksort(MPI_Comm comm, uint32_t* a, uint32_t no_of_elements_for_proc, u
 	MPI_Comm newComm;
 	MPI_Comm_split(comm, (rank_of_the_proc/lesser_no_proc?1:0), 1, &newComm);
 	MPI_Barrier(newComm);
-	return quicksort(newComm, temp, rec_cnt, total_no_proc, filename);
+	return quicksort(newComm, temp, rec_cnt, total_no_proc, total_element_count, filename);
 }
 
-uint32_t main(int argc, char *argv[]) {
+int main(int argc, char *argv[]) {
 	if(argc!=3) {
-		printf("Incorrect number of parameter passed\n");
+		printf("Incorrect number of parameters passed\n");
 		return 0;
 	}
 
@@ -354,8 +392,8 @@ uint32_t main(int argc, char *argv[]) {
 			printf("Serial "); 
 			print_time(serialEndTime - serialStartTime);
 			print_numbers("test.txt", allElements, total_no_of_elements);
+			free(allElements);
 		}
-		printf("TESTing\n");
 		MPI_Barrier(MPI_COMM_WORLD);
 	#endif
 
@@ -366,7 +404,7 @@ uint32_t main(int argc, char *argv[]) {
 	double startTime, endTime;
 	startTime = monotonic_seconds();
 	MPI_Scan( (void*)&startTime, (void*)&startTime, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
-	endTime = quicksort(MPI_COMM_WORLD, a, no_of_elements_per_proc, total_no_proc, filename);
+	endTime = quicksort(MPI_COMM_WORLD, a, no_of_elements_per_proc, total_no_proc, total_no_of_elements, filename);
 	MPI_Scan( (void*)&endTime, (void*)&endTime, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
 
 	if(rank_of_the_proc == total_no_proc-1)
