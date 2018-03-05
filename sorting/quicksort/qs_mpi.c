@@ -146,14 +146,10 @@ uint32_t partition(MPI_Comm comm, uint32_t* a, uint32_t no_of_elements_for_proc)
 				swap(&received_contenders[i],&received_contenders[j]);
 		}
 	}
-	if(size_of_the_comm % 2) {
-		if(size_of_the_comm==1)
-			pivot = received_contenders[size_of_the_comm/2];
-		else
-			pivot = (received_contenders[size_of_the_comm/2]+received_contenders[size_of_the_comm/2 - 1]) / 2;
-	}
-	else
+	if(size_of_the_comm % 2)
 		pivot = received_contenders[size_of_the_comm/2];
+	else
+		pivot = (received_contenders[size_of_the_comm/2] + received_contenders[size_of_the_comm/2 - 1]) / 2;
 
 	/*
 	Perform partition
@@ -231,6 +227,10 @@ double quicksort(MPI_Comm comm, uint32_t* a, uint32_t no_of_elements_for_proc, u
 		uint32_t *result_evenly_distributed = malloc(sizeof(uint32_t) * total_rec_cnt);
 		MPI_Alltoallv( (void*)a, (void*)send_count, (void*)send_displs, MPI_UNSIGNED,  (void*)result_evenly_distributed, (void*)receive_count, (void*)receive_displs, MPI_UNSIGNED, MPI_COMM_WORLD);
 		free(a);
+		free(send_count);
+		free(send_displs);
+		free(receive_count);
+		free(receive_displs);
 
 		/*
 		Step 2 of the algorithm completed.
@@ -253,9 +253,7 @@ double quicksort(MPI_Comm comm, uint32_t* a, uint32_t no_of_elements_for_proc, u
 			result = (uint32_t*)malloc(sizeof(uint32_t) * total_element_count);
 		}
 		MPI_Gatherv( (void*)result_evenly_distributed, no_of_elements_per_proc, MPI_UNSIGNED, (void*)result, rec_cnt, rec_displs, MPI_UNSIGNED, proc_size-1, MPI_COMM_WORLD);
-		if(proc_rank == proc_size-1)
-			print_numbers(filename, result, total_element_count);
-		
+
 		/*
 		Check correctness
 		*/
@@ -268,6 +266,12 @@ double quicksort(MPI_Comm comm, uint32_t* a, uint32_t no_of_elements_for_proc, u
 			}
 		#endif
 
+		if(proc_rank == proc_size-1) {
+			print_numbers(filename, result, total_element_count);
+			free(rec_cnt);
+			free(rec_displs);
+			free(result);
+		}
 		return endTime;
 	}
 
@@ -315,7 +319,7 @@ double quicksort(MPI_Comm comm, uint32_t* a, uint32_t no_of_elements_for_proc, u
 	uint32_t *send_displs = calloc(size_of_the_comm, sizeof(uint32_t));
 	uint32_t *receive_displs = calloc(size_of_the_comm, sizeof(uint32_t));
 	uint32_t lesser_per_proc_count = counts[0] / lesser_no_proc;
-	for(i=0;i<lesser_count;i++) {
+	for(i=0; i<lesser_count; i++) {
 		uint32_t dest = (lesser_count_cumulative_exclusive + i);
 		while(j!=lesser_no_proc-1 && dest >= (j+1)*lesser_per_proc_count)
 			j++;
@@ -358,6 +362,10 @@ double quicksort(MPI_Comm comm, uint32_t* a, uint32_t no_of_elements_for_proc, u
 	uint32_t *temp = malloc(sizeof(uint32_t) * rec_cnt);
 	MPI_Alltoallv( (void*)a, (void*)send_count, (void*)send_displs, MPI_UNSIGNED,       (void*)temp, (void*)receive_count, (void*)receive_displs, MPI_UNSIGNED,    comm );
 	free(a);
+	free(send_count);
+	free(send_displs);
+	free(receive_count);
+	free(receive_displs);
 
 	/*
 	Split the communicators into 2 parts
@@ -398,9 +406,8 @@ int main(int argc, char *argv[]) {
 	uint32_t *a = (uint32_t *)malloc(sizeof(uint32_t) * no_of_elements_per_proc);
 	uint32_t i;
 	srand((uint32_t) rank_of_the_proc);
-	for(i=0;i<no_of_elements_per_proc;i++) {
+	for(i=0;i<no_of_elements_per_proc;i++)
 		a[i] = (uint32_t)rand();
-	}
 
 	/* Test with serial quicksort : output stored in test.txt */
 	#if TEST
