@@ -1,3 +1,6 @@
+/*
+Author : RohitJV
+*/
 #include <time.h>
 #include <mpi.h>
 #include <stdio.h>
@@ -91,6 +94,27 @@ int cmpfunc (const void * a, const void * b) {
    return ( *(uint32_t*)a > *(uint32_t*)b ? 1 : -1);
 }
 
+int serial_partition(uint32_t *a, int lo, int hi) {
+	int i, idx=lo-1;
+	uint32_t pivot=a[hi];
+	for(i=lo; i<hi; i++) {
+		if(a[i] < pivot) {
+			idx++;
+			swap(&a[i], &a[idx]);
+		}
+	}
+	swap(&a[hi], &a[idx+1]);
+	return idx+1;
+}
+
+void serial_quicksort(uint32_t *a, int lo, int hi) {
+	if(lo>=hi)
+		return;
+	int mid = serial_partition(a, lo,  hi);
+	serial_quicksort(a, lo, mid-1);
+	serial_quicksort(a, mid+1, hi);
+}
+
 // **************************************** Helper methods END... ****************************************
 
 uint32_t pick_random_idx(uint32_t n, uint32_t rank_of_the_proc) {
@@ -169,7 +193,8 @@ double quicksort(MPI_Comm comm, uint32_t* a, uint32_t no_of_elements_for_proc, u
 	5. Return the time after completion - endTime
 	*/
 	if(size_of_the_comm == 1) {
-		qsort(a, no_of_elements_for_proc, sizeof(uint32_t), cmpfunc);
+		//qsort(a, no_of_elements_for_proc, sizeof(uint32_t), cmpfunc);
+		serial_quicksort(a, 0, no_of_elements_for_proc-1);
 		uint32_t proc_size, proc_rank;
 		MPI_Comm_size(MPI_COMM_WORLD, &proc_size);
 		MPI_Comm_rank(MPI_COMM_WORLD, &proc_rank);
@@ -214,7 +239,7 @@ double quicksort(MPI_Comm comm, uint32_t* a, uint32_t no_of_elements_for_proc, u
 		double endTime = monotonic_seconds();
 
 		/*
-		1. Gather all the sorted elements in the last processor og MPI_COMM_WORLD
+		1. Gather all the sorted elements in the last processor of MPI_COMM_WORLD
 		2. Print to file
 		*/
 		uint32_t *rec_cnt, *rec_displs, *result;
