@@ -1,0 +1,67 @@
+
+Serial Execution time: 33.0228s
+Execution time: 5.6608s
+jakku004@phi03:/home/jakku004/scratch/paralol/sorting/quicksort $ make
+mpicc qs_mpi.c -o qs_mpi
+mpirun -np 1 ./qs_mpi 1000000 output.txt
+Serial Execution time: 0.2507s
+Execution time: 0.3321s
+diff output.txt test.txt
+mpirun -np 2 ./qs_mpi 1000000 output.txt
+Serial Execution time: 0.2938s
+Execution time: 0.1664s
+diff output.txt test.txt
+mpirun -np 4 ./qs_mpi 1000000 output.txt
+Serial Execution time: 0.2516s
+Execution time: 0.1330s
+diff output.txt test.txt
+mpirun -np 8 ./qs_mpi 1000000 output.txt
+Serial Execution time: 0.2481s
+Execution time: 0.0783s
+diff output.txt test.txt
+mpirun -np 16 ./qs_mpi 1000000 output.txt
+Serial Execution time: 0.3028s
+Execution time: 0.0493s
+diff output.txt test.txt
+mpicc qs_mpi.c -o qs_mpi
+mpirun -np 1 ./qs_mpi 10000000 output.txt
+Serial Execution time: 2.6709s
+Execution time: 3.3063s
+diff output.txt test.txt
+mpirun -np 2 ./qs_mpi 10000000 output.txt
+Serial Execution time: 2.7024s
+Execution time: 1.9016s
+diff output.txt test.txt
+mpirun -np 4 ./qs_mpi 10000000 output.txt
+Serial Execution time: 2.7539s
+Execution time: 1.3945s
+diff output.txt test.txt
+mpirun -np 8 ./qs_mpi 10000000 output.txt
+Serial Execution time: 2.8467s
+Execution time: 0.9692s
+diff output.txt test.txt
+mpirun -np 16 ./qs_mpi 10000000 output.txt
+Serial Execution time: 2.9656s
+Execution time: 0.4066s
+diff output.txt test.txt
+mpicc qs_mpi.c -o qs_mpi
+mpirun -np 1 ./qs_mpi 100000000 output.txt
+Serial Execution time: 30.5920s
+Execution time: 36.9821s
+diff output.txt test.txt
+mpirun -np 2 ./qs_mpi 100000000 output.txt
+Serial Execution time: 29.8920s
+Execution time: 28.8348s
+diff output.txt test.txt
+mpirun -np 4 ./qs_mpi 100000000 output.txt
+Serial Execution time: 32.5041s
+Execution time: 13.7634s
+diff output.txt test.txt
+mpirun -np 8 ./qs_mpi 100000000 output.txt
+Serial Execution time: 32.7600s
+Execution time: 7.6210s
+diff output.txt test.txt
+mpirun -np 16 ./qs_mpi 100000000 output.txt
+Serial Execution time: 33.1797s
+Execution time: 5.2081s
+diff output.txt test.txt
