@@ -1033,7 +1033,7 @@ int gk_csr_GetSimilarRows(gk_csr_t *mat, int nqterms, int *qind, float *qval,
   colptr = mat->colptr;
   colind = mat->colind;
   colval = mat->colval;
- 
+
   marker = (i_marker ? i_marker : gk_ismalloc(nrows, -1, "gk_csr_SimilarRows: marker"));
   cand   = (i_cand   ? i_cand   : gk_fkvmalloc(nrows, "gk_csr_SimilarRows: cand"));
 

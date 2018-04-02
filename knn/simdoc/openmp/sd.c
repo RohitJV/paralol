@@ -85,8 +85,10 @@ void ComputeNeighbors(params_t *params)
 
   /* find the best neighbors for each query document */
   gk_startwctimer(params->timer_1);
-  #pragma omp parallel for num_threads(4)
+  #pragma omp parallel for default(shared) private(i,j,nhits) num_threads(8)
   for (i=0; i<mat->nrows; i++) {
+    gk_fkv_t *hits_1;
+    hits_1   = gk_fkvmalloc(mat->nrows, "ComputeNeighbors: hits");
     if (params->verbosity > 0)
       printf("Working on query %7d\n", i);
 
@@ -95,13 +97,13 @@ void ComputeNeighbors(params_t *params)
                  mat->rowptr[i+1]-mat->rowptr[i], 
                  mat->rowind+mat->rowptr[i], 
                  mat->rowval+mat->rowptr[i], 
-                 GK_CSR_JAC, params->nnbrs, params->minsim, hits, 
-                 marker, cand);
+                 GK_CSR_JAC, params->nnbrs, params->minsim, hits_1, 
+                 NULL, NULL);
 
     /* write the results in the file */
     if (fpout) {
       for (j=0; j<nhits; j++) 
-        fprintf(fpout, "%8d %8zd %.3f\n", i, hits[j].val, hits[j].key);
+        fprintf(fpout, "%8d %8zd %.3f\n", i, hits_1[j].val, hits_1[j].key);
     }
   }  
   gk_stopwctimer(params->timer_1);

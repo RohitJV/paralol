@@ -13,6 +13,9 @@
 /*************************************************************************
 * Header file inclusion section
 **************************************************************************/
+/* Gives us high-resolution timers. */
+#define _POSIX_C_SOURCE 199309L
+
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -31,6 +34,7 @@
 #include <inttypes.h>
 #include <sys/resource.h>
 #include <sys/time.h>
+#include "omp.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
