@@ -123,17 +123,12 @@ void ComputeNeighbors(params_t *params)
   }  
   
   for(i=0;i<mat->nrows;i++) {
-    int count = no_threads * params->nnbrs;
-    gk_fkv_t *hits = gk_fkvmalloc(count, "ComputeNeighbors: hits");
-    // memmove(hits, total_hit_array[i], count);
-    for(k=0;k<count;k++) {    
-      hits[k] = total_hit_array[i][k];
-    } 
-    gk_fkvsortd(count, hits);
+    int count = no_threads * params->nnbrs;    
+    gk_fkvsortd(count, total_hit_array[i]);
     /* write the results in the file */
     if (fpout) {
       for (j=0; j<params->nnbrs; j++) 
-        fprintf(fpout, "%8d %8zd %.3f\n", i, hits[j].val, hits[j].key);
+        fprintf(fpout, "%8d %8zd %.3f\n", i, total_hit_array[i][j].val, total_hit_array[i][j].key);
     }
   }
 
