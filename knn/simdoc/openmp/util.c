@@ -4,9 +4,6 @@
 
 static int gk_exit_on_error = 1;
 
-/*************************************************************************
-* Uses the MACROS in gk_mkmemory.h
-**************************************************************************/
 GK_MKALLOC(gk_i,   int)
 GK_MKALLOC(gk_i32, int32_t)
 GK_MKALLOC(gk_f,   float)
@@ -565,16 +562,13 @@ void gk_csr_CompactColumns(gk_csr_t *mat)
 
   collen = gk_ismalloc(ncols, 0, "gk_csr_CompactColumns: collen");
 
-  // Count the number of elements in each column
   for (i=0; i<rowptr[nrows]; i++) 
     collen[rowind[i]]++;
 
-  // Remove zero columns
   for (nncols=0, i=0; i<ncols; i++) {
     if (collen[i] > 0) 
       collen[i] = nncols++;
   }
-  printf("No of columns: %d", nncols);
 
   for (i=0; i<rowptr[nrows]; i++) 
     rowind[i] = collen[rowind[i]];
@@ -771,28 +765,23 @@ gk_csr_t *gk_csr_Read(char *filename, int format, int readvals, int numbering)
 
     /* Parse the string and get the arguments */
     head = line;
-    while (1) {      
-      // Read the column number
+    while (1) {
       ival = strtol(head, &tail, 0);
       if (tail == head) 
         break;
       head = tail;
       
-      // Set the read column number in rowind[]
       if ((rowind[k] = ival + numbering) < 0)
         gk_errexit(SIGERR, "Error: Invalid column number %d at row %d.\n", ival, i);
 
-      // Update the number of columns in the original data matrix
       ncols = gk_max(rowind[k], ncols);
 
-      // Read the value at the position
       if (readvals) {
         fval = strtof(head, &tail);
         if (tail == head)
           gk_errexit(SIGERR, "Value could not be found for column! Row:%d, NNZ:%d\n", i, k);
         head = tail;
 
-        // Set the read value in rowval[]
         rowval[k] = fval;
       }
       k++;
@@ -1054,11 +1043,9 @@ int gk_csr_GetSimilarRows(gk_csr_t *mat, int nqterms, int *qind, float *qval,
       break;
 
     case GK_CSR_JAC:
-      // Iterate through all the non-zero elements of the current row
       for (mynorm=0.0, ncand=0, ii=0; ii<nqterms; ii++) {
         mynorm += qval[ii]*qval[ii];
 
-        // Pick the column of the current non-zero element, and iterate through it
         i = qind[ii];
         for (j=colptr[i]; j<colptr[i+1]; j++) {
           k = colind[j];
@@ -1129,4 +1116,3 @@ int gk_csr_GetSimilarRows(gk_csr_t *mat, int nqterms, int *qind, float *qval,
 
   return nsim;
 }
-

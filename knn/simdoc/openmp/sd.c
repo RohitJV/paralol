@@ -11,6 +11,8 @@
 #include "simdocs.h"
 
 
+int no_threads = 8;
+
 /*************************************************************************/
 /*! This is the entry point for finding simlar patents */
 /**************************************************************************/
@@ -54,10 +56,10 @@ int main(int argc, char *argv[])
 /**************************************************************************/
 void ComputeNeighbors(params_t *params)
 {
-  int i, j, nhits;
+  int i, j, k, nhits;
   gk_csr_t *mat;
   int32_t *marker;
-  gk_fkv_t *hits, *cand;
+  gk_fkv_t *cand;
   FILE *fpout;
 
   printf("Reading data for %s...\n", params->infstem);
@@ -76,46 +78,71 @@ void ComputeNeighbors(params_t *params)
   gk_csr_CreateIndex(mat, GK_CSR_COL);
 
   /* create the output file */
-  fpout = (params->outfile ? gk_fopen(params->outfile, "w", "ComputeNeighbors: fpout") : NULL);
-
-  /* allocate memory for the necessary working arrays */
-  hits   = gk_fkvmalloc(mat->nrows, "ComputeNeighbors: hits");
-  marker = gk_i32smalloc(mat->nrows, -1, "ComputeNeighbors: marker");
-  cand   = gk_fkvmalloc(mat->nrows, "ComputeNeighbors: cand");
+  fpout = (params->outfile ? gk_fopen(params->outfile, "w", "ComputeNeighbors: fpout") : NULL);    
 
   /* find the best neighbors for each query document */
   gk_startwctimer(params->timer_1);
-  #pragma omp parallel for default(shared) private(i,j,nhits) num_threads(8)
-  for (i=0; i<mat->nrows; i++) {
-    gk_fkv_t *hits_1;
-    hits_1   = gk_fkvmalloc(mat->nrows, "ComputeNeighbors: hits");
-    if (params->verbosity > 0)
-      printf("Working on query %7d\n", i);
 
-    /* find the neighbors of the ith document */ 
-    nhits = gk_csr_GetSimilarRows(mat, 
-                 mat->rowptr[i+1]-mat->rowptr[i], 
-                 mat->rowind+mat->rowptr[i], 
-                 mat->rowval+mat->rowptr[i], 
-                 GK_CSR_JAC, params->nnbrs, params->minsim, hits_1, 
-                 NULL, NULL);
+  // automate this part
+  int div_x=2, div_y=4;  
 
-    /* write the results in the file */
-    if (fpout) {
-      for (j=0; j<nhits; j++) 
-        fprintf(fpout, "%8d %8zd %.3f\n", i, hits_1[j].val, hits_1[j].key);
+  gk_fkv_t **total_hit_array = (gk_fkv_t **)malloc(mat->nrows * sizeof(gk_fkv_t*));
+  total_hit_array[0] = (gk_fkv_t *)malloc(sizeof(gk_fkv_t) * mat->nrows * no_threads * params->nnbrs);
+  for(i = 0; i < mat->nrows; i++)
+    total_hit_array[i] = (*total_hit_array + no_threads * params->nnbrs * i);
+
+  #pragma omp parallel for default(shared) private(i,j) num_threads(no_threads)
+  for (i=0;i<no_threads;i++) {
+    int offset1 = i/div_y, offset2 = i%div_y;
+    int startRow1 = (mat->nrows)/div_x * offset1;
+    int startRow2 = (mat->nrows)/div_y * offset2;
+    int no_rows_y = (mat->nrows)/div_y;
+    if(offset2 == div_y-1)
+      no_rows_y = mat->nrows - startRow2;
+    gk_csr_t *comparing_rows_mat = gk_csr_ExtractSubmatrix(mat, startRow2, no_rows_y);
+    gk_csr_CreateIndex(comparing_rows_mat, GK_CSR_COL);    
+
+    int endRow1 = startRow1 + (mat->nrows)/div_x;
+    if(offset1 == div_x-1)
+      endRow1 = mat->nrows;    
+
+    for(j=startRow1;j<endRow1;j++) {      
+      gk_fkv_t *hits = gk_fkvmalloc(comparing_rows_mat->nrows, "ComputeNeighbors: hits");
+      int localhits = gk_csr_GetSimilarRows(comparing_rows_mat, 
+                   mat->rowptr[j+1] - mat->rowptr[j], 
+                   mat->rowind + mat->rowptr[j], 
+                   mat->rowval + mat->rowptr[j], 
+                   GK_CSR_JAC, params->nnbrs, params->minsim, hits, 
+                   NULL, NULL);          
+      int proc_offset = i*params->nnbrs;
+      for (k=0; k<localhits; k++) {
+        hits[k].val = hits[k].val + startRow2;
+        total_hit_array[j][proc_offset + k] = hits[k];
+      }
     }
   }  
-  gk_stopwctimer(params->timer_1);
+  
+  for(i=0;i<mat->nrows;i++) {
+    int count = no_threads * params->nnbrs;
+    gk_fkv_t *hits = gk_fkvmalloc(count, "ComputeNeighbors: hits");
+    // memmove(hits, total_hit_array[i], count);
+    for(k=0;k<count;k++) {    
+      hits[k] = total_hit_array[i][k];
+    } 
+    gk_fkvsortd(count, hits);
+    /* write the results in the file */
+    if (fpout) {
+      for (j=0; j<params->nnbrs; j++) 
+        fprintf(fpout, "%8d %8zd %.3f\n", i, hits[j].val, hits[j].key);
+    }
+  }
 
+  gk_stopwctimer(params->timer_1);
 
   /* cleanup and exit */
   if (fpout) gk_fclose(fpout);
-
-  gk_free((void **)&hits, &marker, &cand, LTERM);
 
   gk_csr_Free(&mat);
 
   return;
 }
-

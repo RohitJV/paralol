@@ -13,9 +13,6 @@
 /*************************************************************************
 * Header file inclusion section
 **************************************************************************/
-/* Gives us high-resolution timers. */
-#define _POSIX_C_SOURCE 199309L
-
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -34,7 +31,6 @@
 #include <inttypes.h>
 #include <sys/resource.h>
 #include <sys/time.h>
-#include "omp.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -50,11 +46,8 @@ typedef ssize_t         gk_idx_t;         /* index variable */
  *-------------------------------------------------------------*/
 typedef struct {
   int nrows, ncols;
-  // rowptr containts number of NNZ elements before that row
   int *rowptr, *colptr, *rowids;
-  // rowind contains column number of each of the NNZ elements, read in row-major
   int *rowind, *colind, *colids;
-  // rowval contains value at index 'k' when read in row-major
   float *rowval, *colval;
   float *rnorms, *cnorms;
   float *rsums, *csums;
