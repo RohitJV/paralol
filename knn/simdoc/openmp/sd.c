@@ -83,15 +83,25 @@ void ComputeNeighbors(params_t *params)
   /* find the best neighbors for each query document */
   gk_startwctimer(params->timer_1);
 
-  // automate this part
-  int div_x=2, div_y=4;  
+  /* Set split-up of rows */
+  int div_x, div_y;
+  if(no_threads == 1)
+    div_x = 1;
+  else if(no_threads == 2)
+    div_x = 2;
+  else if(no_threads == 4)
+    div_x = 2;
+  else if(no_threads == 8)
+    div_x = 2; 
+  div_y = no_threads/div_x;
 
+  /* Create a global array for hits - total_hit_array[row][hits across all processors/threads] */
   gk_fkv_t **total_hit_array = (gk_fkv_t **)malloc(mat->nrows * sizeof(gk_fkv_t*));
   total_hit_array[0] = (gk_fkv_t *)malloc(sizeof(gk_fkv_t) * mat->nrows * no_threads * params->nnbrs);
   for(i = 0; i < mat->nrows; i++)
     total_hit_array[i] = (*total_hit_array + no_threads * params->nnbrs * i);
 
-  #pragma omp parallel for default(shared) private(i,j) num_threads(no_threads)
+  #pragma omp parallel for default(shared) private(i,j,k) num_threads(no_threads)
   for (i=0;i<no_threads;i++) {
     int offset1 = i/div_y, offset2 = i%div_y;
     int startRow1 = (mat->nrows)/div_x * offset1;
@@ -113,12 +123,13 @@ void ComputeNeighbors(params_t *params)
                    mat->rowind + mat->rowptr[j], 
                    mat->rowval + mat->rowptr[j], 
                    GK_CSR_JAC, params->nnbrs, params->minsim, hits, 
-                   NULL, NULL);          
+                   NULL, NULL);              
       int proc_offset = i*params->nnbrs;
       for (k=0; k<localhits; k++) {
         hits[k].val = hits[k].val + startRow2;
         total_hit_array[j][proc_offset + k] = hits[k];
       }
+      free(hits);
     }
   }  
   
