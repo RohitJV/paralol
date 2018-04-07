@@ -79,9 +79,9 @@ void ComputeNeighbors(params_t *params)
   fpout = (params->outfile ? gk_fopen(params->outfile, "w", "ComputeNeighbors: fpout") : NULL);
 
   /* allocate memory for the necessary working arrays */
-  hits   = gk_fkvmalloc(mat->nrows, "ComputeNeighbors: hits");
-  marker = gk_i32smalloc(mat->nrows, -1, "ComputeNeighbors: marker");
-  cand   = gk_fkvmalloc(mat->nrows, "ComputeNeighbors: cand");
+  // hits   = gk_fkvmalloc(mat->nrows, "ComputeNeighbors: hits");
+  // marker = gk_i32smalloc(mat->nrows, -1, "ComputeNeighbors: marker");
+  // cand   = gk_fkvmalloc(mat->nrows, "ComputeNeighbors: cand");
 
 
   /* find the best neighbors for each query document */
@@ -91,18 +91,20 @@ void ComputeNeighbors(params_t *params)
       printf("Working on query %7d\n", i);
 
     /* find the neighbors of the ith document */ 
+    hits   = gk_fkvmalloc(mat->nrows, "ComputeNeighbors: hits");
     nhits = gk_csr_GetSimilarRows(mat, 
                  mat->rowptr[i+1]-mat->rowptr[i], 
                  mat->rowind+mat->rowptr[i], 
                  mat->rowval+mat->rowptr[i], 
                  GK_CSR_JAC, params->nnbrs, params->minsim, hits, 
-                 marker, cand);
+                 NULL, NULL);
 
     /* write the results in the file */
     if (fpout) {
       for (j=0; j<nhits; j++) 
         fprintf(fpout, "%8d %8zd %.3f\n", i, hits[j].val, hits[j].key);
     }
+    free(hits);
   }
   gk_stopwctimer(params->timer_1);
 
@@ -110,7 +112,7 @@ void ComputeNeighbors(params_t *params)
   /* cleanup and exit */
   if (fpout) gk_fclose(fpout);
 
-  gk_free((void **)&hits, &marker, &cand, LTERM);
+  //gk_free((void **)&hits, &marker, &cand, LTERM);
 
   gk_csr_Free(&mat);
 
