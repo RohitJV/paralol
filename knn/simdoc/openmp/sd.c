@@ -11,7 +11,7 @@
 #include "simdocs.h"
 
 
-int no_threads = 8;
+int no_threads = -1;
 
 /*************************************************************************/
 /*! This is the entry point for finding simlar patents */
@@ -21,7 +21,7 @@ int main(int argc, char *argv[])
   params_t params;
   int rc = EXIT_SUCCESS;
 
-  cmdline_parse(&params, argc, argv);
+  cmdline_parse(&params, argc, argv);  
 
   printf("********************************************************************************\n");
   printf("sd (%d.%d.%d) Copyright 2011, GK.\n", VER_MAJOR, VER_MINOR, VER_SUBMINOR);
@@ -61,6 +61,7 @@ void ComputeNeighbors(params_t *params)
   int32_t *marker;
   gk_fkv_t *cand;
   FILE *fpout;
+  no_threads = params->nthreads;  
 
   printf("Reading data for %s...\n", params->infstem);
 

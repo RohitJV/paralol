@@ -21,6 +21,7 @@
 #define CMD_MINSIM              22
 #define CMD_VERBOSITY           70
 #define CMD_HELP                100
+#define CMD_NTHREADS			150
 
 
 #endif

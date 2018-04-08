@@ -14,4 +14,6 @@ SOURCE = sd.c getopt.c cmdline.c util.c
 EXE = sd
 
 default:
+	export OMP_PLACES=cores
+	export OMP_PROC_BIND=spread
 	$(CC) $(CFLAGS) $(SOURCE) $(LIBS) -o $(EXE)

@@ -21,7 +21,7 @@ This file contains various data structures used by paragon
 typedef struct {
   int nnbrs;                    /*!< The maximum number of nearest grants to output */
   float minsim;                 /*!< The minimum similarity to use for keeping neighbors */ 
-
+  int nthreads;
   int verbosity;                /*!< The reporting verbosity level */
 
   char *infstem;                /*!< The filestem of the input file */

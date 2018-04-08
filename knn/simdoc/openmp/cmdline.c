@@ -20,7 +20,7 @@ static struct gk_option long_options[] = {
   {"nnbrs",             1,      0,      CMD_NNBRS},
   {"minsim",            1,      0,      CMD_MINSIM},
   {"verbosity",         1,      0,      CMD_VERBOSITY},
-
+  {"nthreads",          1,      0,      CMD_NTHREADS},
   {"help",              0,      0,      CMD_HELP},
   {0,                   0,      0,      0}
 };
@@ -72,7 +72,7 @@ void cmdline_parse(params_t *params, int argc, char *argv[])
   params->nnbrs     = 100;
   params->minsim    = 0.25;
   params->verbosity = -1;
-
+  params->nthreads = 1;
 
   /* Parse the command line arguments  */
   while ((c = gk_getopt_long_only(argc, argv, "", long_options, &option_index)) != -1) {
@@ -97,6 +97,14 @@ void cmdline_parse(params_t *params, int argc, char *argv[])
           params->verbosity = atoi(gk_optarg);
           if (params->verbosity < 0) 
             errexit("The -verbosity must be non-negative.\n");
+        }
+        break;
+
+      case CMD_NTHREADS:
+        if (gk_optarg) {
+          params->nthreads = atoi(gk_optarg);
+          if (params->nthreads <= 0) 
+            errexit("The -nthreads must be positive.\n");
         }
         break;
 
