@@ -17,7 +17,7 @@ default:
 	export OMP_PLACES=cores
 	export OMP_PROC_BIND=spread
 	$(CC) $(CFLAGS) $(SOURCE) $(LIBS) -o $(EXE)
-	./sd -nnbrs=50 -minsim=.01 -nthread=1 /home/jakku004/windows/assignment-3/sports.mat > out50-1
+	./sd -nnbrs=50 -minsim=.01 -nthread=1 /export/scratch/CSCI5451_S18/assignment-3/sports.mat > out50-1
 	./sd -nnbrs=50 -minsim=.01 -nthread=2 /home/jakku004/windows/assignment-3/sports.mat > out50-2
 	./sd -nnbrs=50 -minsim=.01 -nthread=4 /home/jakku004/windows/assignment-3/sports.mat > out50-4
 	./sd -nnbrs=50 -minsim=.01 -nthread=8 /home/jakku004/windows/assignment-3/sports.mat > out50-8
