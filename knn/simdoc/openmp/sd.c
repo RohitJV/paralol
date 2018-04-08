@@ -25,7 +25,7 @@ int main(int argc, char *argv[])
 
   printf("********************************************************************************\n");
   printf("sd (%d.%d.%d) Copyright 2011, GK.\n", VER_MAJOR, VER_MINOR, VER_SUBMINOR);
-  printf("  nnbrs=%d, minsim=%.2f, minsim=%d\n",
+  printf("  nnbrs=%d, minsim=%.2f, nthreads=%d\n",
       params.nnbrs, params.minsim, params.nthreads);
 
   gk_clearwctimer(params.timer_global);
@@ -134,11 +134,11 @@ void ComputeNeighbors(params_t *params)
     }
   }  
   
-  for(i=0;i<mat->nrows;i++) {
-    int count = no_threads * params->nnbrs;    
-    gk_fkvsortd(count, total_hit_array[i]);
-    /* write the results in the file */
-    if (fpout) {
+  if (fpout) {
+    for(i=0;i<mat->nrows;i++) {
+      int count = no_threads * params->nnbrs;    
+      gk_fkvsortd(count, total_hit_array[i]);
+      /* write the results in the file */    
       for (j=0; j<params->nnbrs && total_hit_array[i][j].key>=params->minsim; j++) 
         fprintf(fpout, "%8d %8zd %.3f\n", i, total_hit_array[i][j].val, total_hit_array[i][j].key);
     }
