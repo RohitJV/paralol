@@ -123,19 +123,13 @@ void ComputeNeighbors(params_t *params)
       endRow1 = mat->nrows;    
 
     for(j=startRow1;j<endRow1;j++) {      
-      gk_fkv_t *hits = gk_fkvmalloc(comparing_rows_mat->nrows, "ComputeNeighbors: hits");
+      int proc_offset = i*params->nnbrs;      
       int localhits = gk_csr_GetSimilarRows(comparing_rows_mat, 
                    mat->rowptr[j+1] - mat->rowptr[j], 
                    mat->rowind + mat->rowptr[j], 
                    mat->rowval + mat->rowptr[j], 
-                   GK_CSR_JAC, params->nnbrs, params->minsim, hits, 
-                   NULL, NULL);              
-      int proc_offset = i*params->nnbrs;
-      for (k=0; k<localhits; k++) {
-        hits[k].val = hits[k].val + startRow2;
-        total_hit_array[j][proc_offset + k] = hits[k];
-      }
-      free(hits);
+                   GK_CSR_JAC, params->nnbrs, params->minsim, total_hit_array[j]+proc_offset, 
+                   NULL, NULL);                         
     }
   }  
   
@@ -155,6 +149,8 @@ void ComputeNeighbors(params_t *params)
         }
       }       
       result_array[i][neighbor] = total_hit_array[i][idx[maxIdx]];
+      int offset = (mat->nrows)/div_y;      
+      result_array[i][neighbor].val = result_array[i][neighbor].val + (mat->nrows)/div_y * maxIdx;
       idx[maxIdx]++;       
     }
   }
