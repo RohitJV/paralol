@@ -86,11 +86,11 @@ void ComputeNeighbors(params_t *params)
   if(no_threads == 1)
     div_x = 1;
   else if(no_threads == 2)
-    div_x = 1;
+    div_x = 2;
   else if(no_threads == 4)
-    div_x = 1;
+    div_x = 2;
   else if(no_threads == 8)
-    div_x = 1; 
+    div_x = 2; 
   div_y = no_threads/div_x;
 
   /* Create a global array for hits - total_hit_array[row][hits across all processors/threads] */
@@ -150,7 +150,7 @@ void ComputeNeighbors(params_t *params)
       }       
       result_array[i][neighbor] = total_hit_array[i][idx[maxIdx]];
       int offset = (mat->nrows)/div_y;      
-      result_array[i][neighbor].val = result_array[i][neighbor].val + (mat->nrows)/div_y * maxIdx;
+      result_array[i][neighbor].val = result_array[i][neighbor].val + offset * maxIdx%div_y;
       idx[maxIdx]++;       
     }
   }
