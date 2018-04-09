@@ -99,6 +99,11 @@ void ComputeNeighbors(params_t *params)
   for(i = 0; i < mat->nrows; i++)
     total_hit_array[i] = (*total_hit_array + no_threads * params->nnbrs * i);
 
+  gk_fkv_t **result_array = (gk_fkv_t **)malloc(mat->nrows * sizeof(gk_fkv_t*));
+  result_array[0] = (gk_fkv_t *)malloc(sizeof(gk_fkv_t) * mat->nrows * no_threads * params->nnbrs);
+  for(i = 0; i < mat->nrows; i++)
+    result_array[i] = (*result_array + no_threads * params->nnbrs * i);
+
   /* find the best neighbors for each query document */
   gk_startwctimer(params->timer_1);
 
@@ -134,17 +139,31 @@ void ComputeNeighbors(params_t *params)
     }
   }  
   
-  #pragma omp parallel for default(shared) private(i) num_threads(no_threads)
-  for(i=0;i<mat->nrows;i++) {
-    int count = no_threads * params->nnbrs;    
-    gk_fkvsortd(count, total_hit_array[i]);    
+  #pragma omp parallel for default(shared) private(i,j) num_threads(no_threads)
+  for(i=0;i<mat->nrows;i++) {    
+    int *idx = (int*)malloc(no_threads*sizeof(int));
+    for(j=0;j<no_threads;j++)
+      idx[j] = j*params->nnbrs;
+    int neighbor;
+    for(neighbor=0;neighbor<params->nnbrs;neighbor++) {       
+      int maxIdx = -1;
+      float maxSim = -1;
+      for(j=0;j<no_threads;j++) {        
+        if(total_hit_array[i][idx[j]].key > maxSim) {
+          maxSim = total_hit_array[i][idx[j]].key;
+          maxIdx = j;
+        }
+      }       
+      result_array[i][neighbor] = total_hit_array[i][idx[maxIdx]];
+      idx[maxIdx]++;       
+    }
   }
 
   /* write the results in the file */
   for(i=0;i<mat->nrows;i++) {
     if (fpout) {
-      for (j=0; j<params->nnbrs && total_hit_array[i][j].key >= params->minsim; j++) 
-        fprintf(fpout, "%8d %8zd %.3f\n", i, total_hit_array[i][j].val, total_hit_array[i][j].key);
+      for (j=0; j<params->nnbrs && result_array[i][j].key >= params->minsim; j++) 
+        fprintf(fpout, "%8d %8zd %.3f\n", i, result_array[i][j].val, result_array[i][j].key);
     }
   }
 
