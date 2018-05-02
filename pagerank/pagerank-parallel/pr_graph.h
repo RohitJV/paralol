@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-typedef uint64_t pr_int;
+typedef uint32_t pr_int;
 
 
 /**
@@ -17,6 +17,7 @@ typedef struct
   pr_int nedges;
 
   pr_int start_vertex;
+  pr_int total_nvtxs;
 
   /** The sparsity structure of the adjacency list. Vertex v has outgoing edges
    *  xadj[v] (inclusive) to xadj[v+1] (exclusive). */

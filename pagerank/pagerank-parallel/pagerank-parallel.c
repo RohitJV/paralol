@@ -9,10 +9,12 @@ Author : RohitJV
 #include <math.h>
 #include <stdint.h>
 #include <limits.h>
-
 #include "pr_graph.h"
 
-#define TEST 1
+#define TEST_CHUNKING 0
+#define TEST_OUTGOING_TO_INCOMING 1
+
+#define DEFAULT_LIST_SIZE 5000009
 
 
 // **************************************** Helper methods BEGIN ****************************************
@@ -40,6 +42,21 @@ static void print_time(double const seconds) {
 }
 double startTime, endTime;
 
+int cmpfunc (const void * a, const void * b) {
+   return ( *(pr_int*)a > *(pr_int*)b ? 1 : -1);
+}
+
+/*
+TODO - Try to modify so that the list size is allocated dynamically
+*/
+void addToList(pr_int* list, pr_int x, pr_int *count) {
+	if(list == NULL)
+		list = (pr_int *)malloc(DEFAULT_LIST_SIZE * sizeof(pr_int));						
+	list[*count] = x;
+	*count = *count + 1;
+}
+
+
 void print_graph(pr_graph * graph) {
 	/*
 	Print stuff to console.
@@ -50,7 +67,7 @@ void print_graph(pr_graph * graph) {
 	/*
 	Print stuff to file.
 	*/
-	FILE * opFile = fopen("test.txt", "a");		
+	FILE * opFile = fopen("test_chunking.txt", "a");		
 	int i, start_vertex = graph->start_vertex;
 	int edge_ptr = 0;
 	for(i=1; i <= graph->nvtxs; i++) {		
@@ -59,6 +76,29 @@ void print_graph(pr_graph * graph) {
 			edge_ptr++;
 		}
 		fprintf(opFile, "\n");
+	}	
+	fclose(opFile);
+}
+
+
+void print_edges(pr_graph * graph) {
+	/*
+	Print stuff to console.
+	*/
+	// printf("Vertices : %d\n", graph->nvtxs);
+	// printf("Size of the object : %d\n", sizeof(*graph));
+	
+	/*
+	Print stuff to file.
+	*/
+	FILE * opFile = fopen("test_outgoing_to_incoming_main.txt", "a");		
+	int i, start_vertex = graph->start_vertex;
+	int edge_ptr = 0;
+	for(i=1; i <= graph->nvtxs; i++) {		
+		while (edge_ptr < graph->xadj[i]) {
+			fprintf(opFile, "%d, %d\n", start_vertex + (i-1), graph->nbrs[edge_ptr]);
+			edge_ptr++;
+		}		
 	}	
 	fclose(opFile);
 }
@@ -75,13 +115,21 @@ void send_graph(pr_graph * graph, int cur_proc_rank) {
 	MPI_Comm_size(MPI_COMM_WORLD, &total_no_proc);
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank_of_the_proc);
   	  	  	
-  	MPI_Send( (void*)&(graph->nvtxs), 1,  MPI_LONG_LONG_INT, cur_proc_rank, 0, MPI_COMM_WORLD);
-  	MPI_Send( (void*)&(graph->nedges), 1,  MPI_LONG_LONG_INT, cur_proc_rank, 0, MPI_COMM_WORLD);
-  	MPI_Send( (void*)&(graph->start_vertex), 1,  MPI_LONG_LONG_INT, cur_proc_rank, 0, MPI_COMM_WORLD);
+  	MPI_Bcast( (void*)&(graph->total_nvtxs), 1, MPI_UNSIGNED, total_no_proc-1, MPI_COMM_WORLD );
+  	MPI_Send( (void*)&(graph->nvtxs), 1,  MPI_UNSIGNED, cur_proc_rank, 0, MPI_COMM_WORLD);
+  	MPI_Send( (void*)&(graph->nedges), 1,  MPI_UNSIGNED, cur_proc_rank, 0, MPI_COMM_WORLD);
+  	MPI_Send( (void*)&(graph->start_vertex), 1,  MPI_UNSIGNED, cur_proc_rank, 0, MPI_COMM_WORLD);
   	printf("sent vertices : %d\n", graph->nvtxs);
-  	MPI_Send( (void*)graph->xadj, graph->nvtxs + 1, MPI_LONG_LONG_INT, cur_proc_rank, 0, MPI_COMM_WORLD);  	
-  	MPI_Send( (void*)graph->nbrs, graph->nedges, MPI_UNSIGNED_LONG, cur_proc_rank, 0, MPI_COMM_WORLD);
+  	MPI_Send( (void*)graph->xadj, graph->nvtxs + 1, MPI_UNSIGNED, cur_proc_rank, 0, MPI_COMM_WORLD);  	
+  	MPI_Send( (void*)graph->nbrs, graph->nedges, MPI_UNSIGNED, cur_proc_rank, 0, MPI_COMM_WORLD);
 }
+
+pr_int calcOwnerProc(pr_int endpoint, pr_int total_nvtxs, int total_no_proc) {
+	pr_int vertices_per_process = total_nvtxs / total_no_proc;
+	if(endpoint/vertices_per_process < total_no_proc)
+		return endpoint/vertices_per_process;
+	return total_no_proc-1;
+} 
 
 // **************************************** Helper methods END... ****************************************
 
@@ -98,8 +146,8 @@ void distributeVertices(FILE * fin, pr_int nvtxs, pr_int nedges, pr_graph **last
   	size_t len = 0; 
   	pr_int v = 0, prev_v = 0, prev_e = 0;  	  	  	
 
-	#if TEST
-  		FILE * opFile = fopen("test.txt", "w");
+	#if TEST_CHUNKING
+  		FILE * opFile = fopen("test_chunking.txt", "w");
 		fprintf(opFile, "%d %d\n", nvtxs, nedges);
 		fclose(opFile);
   	#endif
@@ -115,6 +163,7 @@ void distributeVertices(FILE * fin, pr_int nvtxs, pr_int nedges, pr_graph **last
 	  	Initialize the graph
 	  	*/	  	
 	  	pr_graph * graph = malloc(sizeof(*graph));
+	  	graph->total_nvtxs = nvtxs;
 	  	graph->nvtxs = v;
 	  	graph->nedges = nedges;
 	  	graph->start_vertex = v;
@@ -136,7 +185,9 @@ void distributeVertices(FILE * fin, pr_int nvtxs, pr_int nedges, pr_graph **last
 
 			graph->xadj[v - prev_v] = edge_count - prev_e;
 
-		    /* Foreach edge in line. */
+		    /* Foreach edge in line, add to a list */
+		    pr_int* nnbrs_list = (pr_int *)malloc(DEFAULT_LIST_SIZE * sizeof(pr_int));
+		    pr_int nnbrs_count = 0;
 		    char * ptr = strtok(line, " ");
 		    while(ptr != NULL) {
 		      char * end = NULL;
@@ -144,11 +195,20 @@ void distributeVertices(FILE * fin, pr_int nvtxs, pr_int nedges, pr_graph **last
 		      /* end of line */
 		      if(ptr == end)
 		        break;		    
-		      graph->nbrs[edge_count - prev_e] = e_id - 1; /* 1 indexed */ 	      
-		      edge_count++;
+			  //addToList(nnbrs_list, e_id, &nnbrs_count);			  				  	      		      			 
+		      nnbrs_list[nnbrs_count++] = e_id;
 		      ptr = strtok(NULL, " ");
-		    }		    
+		    }		
+		    /* Sort this list and add to nbrs */
+		    qsort(nnbrs_list, nnbrs_count, sizeof(pr_int), cmpfunc);
+		    pr_int nnbrs_ptr = 0;
+		    while(nnbrs_ptr != nnbrs_count) {		      		      
+		      graph->nbrs[edge_count - prev_e] = nnbrs_list[nnbrs_ptr] - 1; /* 1 indexed */ 	      
+		      edge_count++;
+		      nnbrs_ptr++;
+		    }	    
 		    v++;
+		    free(nnbrs_list);
 
 		    /* 
 		    If we have enough edges for a processor, break the loop, and communicate the vertices/edges to the respective processor
@@ -183,21 +243,23 @@ int main(int argc, char *argv[]) {
 	if(argc!=3) {
 		printf("Incorrect number of parameters passed\n");
 		return 0;
-	}
+	}	
 
 	MPI_Init(&argc, &argv);
-	int total_no_proc, rank_of_the_proc, i=0;
+	int total_no_proc, rank_of_the_proc, i=0, j=0, k=0;
 	MPI_Comm_size(MPI_COMM_WORLD, &total_no_proc);
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank_of_the_proc);
 
-	int nvtxs, nedges;
+	int nvtxs, nedges, max_val = nvtxs+1000;
 	pr_graph * graph = malloc(sizeof(*graph));
 
 	/*
-	If the processor is the highest rank, then read the input file
+	Read the input in chucks and distribute to processors
 	*/	
 	if(rank_of_the_proc == total_no_proc-1) {
-		// Make sanity checks
+		/*
+		If the processor is the highest rank, then read the input file
+		*/		
 		if(argc == 1) {
 		    fprintf(stderr, "usage: %s <graph> [output file]\n", *argv);
 		    return EXIT_FAILURE;
@@ -227,26 +289,212 @@ int main(int argc, char *argv[]) {
 		graph->nvtxs = nvtxs;
 	  	graph->nedges = nedges;
 	  	graph->start_vertex = 0;
-	  	// TODO - Reallocate with smaller size	  	
+	  	// TODO - Reallocate with smaller size
 
 	  	MPI_Status recv_status;
-		MPI_Recv( (void*)&(graph->nvtxs), 1, MPI_LONG_LONG_INT, total_no_proc - 1, 0, MPI_COMM_WORLD, &recv_status);
-		MPI_Recv( (void*)&(graph->nedges), 1, MPI_LONG_LONG_INT, total_no_proc - 1, 0, MPI_COMM_WORLD, &recv_status);
-		MPI_Recv( (void*)&(graph->start_vertex), 1, MPI_LONG_LONG_INT, total_no_proc - 1, 0, MPI_COMM_WORLD, &recv_status);
+
+	  	MPI_Bcast( (void*)&(graph->total_nvtxs), 1, MPI_UNSIGNED, total_no_proc-1, MPI_COMM_WORLD );
+		MPI_Recv( (void*)&(graph->nvtxs), 1, MPI_UNSIGNED, total_no_proc - 1, 0, MPI_COMM_WORLD, &recv_status);
+		MPI_Recv( (void*)&(graph->nedges), 1, MPI_UNSIGNED, total_no_proc - 1, 0, MPI_COMM_WORLD, &recv_status);
+		MPI_Recv( (void*)&(graph->start_vertex), 1, MPI_UNSIGNED, total_no_proc - 1, 0, MPI_COMM_WORLD, &recv_status);
 		graph->xadj = malloc((graph->nvtxs + 1) * sizeof(*graph->xadj));
 	  	graph->nbrs = malloc(graph->nedges * sizeof(*graph->nbrs));
 	  	printf("Received vertices : %d\n", graph->nvtxs);
-		MPI_Recv( (void*)(graph->xadj), graph->nvtxs + 1, MPI_LONG_LONG_INT, total_no_proc - 1, 0, MPI_COMM_WORLD, &recv_status);		
+		MPI_Recv( (void*)(graph->xadj), graph->nvtxs + 1, MPI_UNSIGNED, total_no_proc - 1, 0, MPI_COMM_WORLD, &recv_status);		
 		MPI_Recv( (void*)(graph->nbrs), graph->nedges, MPI_UNSIGNED_LONG, total_no_proc - 1, 0, MPI_COMM_WORLD, &recv_status);
 	}
+	MPI_Barrier(MPI_COMM_WORLD);
+	
 
-	#if TEST
+	/*
+	Some random testing 
+	*/
+	#if TEST_CHUNKING
 		for(i=0; i<total_no_proc; i++) {
 			if(rank_of_the_proc == i)
 				print_graph(graph);
 			MPI_Barrier(MPI_COMM_WORLD);
 		}				
 	#endif 
+	#if TEST_CHUNKING
+		printf("%d\n", graph->total_nvtxs);
+	#endif
+	#if TEST_OUTGOING_TO_INCOMING
+		if(rank_of_the_proc == total_no_proc-1) {
+			FILE * opFile_test_main = fopen("test_outgoing_to_incoming_main.txt", "w");
+			fprintf(opFile_test_main, ".......................................... \n");
+			fclose(opFile_test_main);
+
+		}
+	
+		MPI_Barrier(MPI_COMM_WORLD);
+	
+		for(i=0; i<total_no_proc; i++) {
+			if(rank_of_the_proc == i)
+				print_edges(graph);
+			MPI_Barrier(MPI_COMM_WORLD);
+		}				
+	#endif 
+
+
+	/*
+	Setup to convert outgoing edges to incoming edges
+	*/
+	int* per_proc_count = (int*)calloc(total_no_proc, sizeof(int));
+	int* per_proc_count_ptr = (int*)calloc(total_no_proc, sizeof(int));
+	int* per_proc_count_start = (int*)calloc(total_no_proc, sizeof(int));	
+	int* per_proc_count_end = (int*)calloc(total_no_proc, sizeof(int));
+
+	int* per_proc_outedges_count = (int*)calloc(total_no_proc, sizeof(int));
+	int* per_proc_outedges_count_ptr = (int*)calloc(total_no_proc, sizeof(int));
+	int* per_proc_outedges_count_start = (int*)calloc(total_no_proc, sizeof(int));	
+	int* per_proc_outedges_count_end = (int*)calloc(total_no_proc, sizeof(int));
+
+	int edge_ptr=0, vtx_ptr;
+	for(vtx_ptr = 1; vtx_ptr <= graph->nvtxs; vtx_ptr++) {
+		int* per_proc_per_vtx_count = (int*)calloc(total_no_proc, sizeof(int));;
+		while(edge_ptr < graph->xadj[vtx_ptr]) {
+			pr_int endpoint = graph->nbrs[edge_ptr];
+			int owner_proc_id = calcOwnerProc(endpoint, graph->total_nvtxs, total_no_proc);
+			if(per_proc_per_vtx_count[owner_proc_id] == 0) {
+				per_proc_per_vtx_count[owner_proc_id] = 1;
+				per_proc_count[owner_proc_id]++;
+			}				
+			per_proc_outedges_count[owner_proc_id]++;
+			edge_ptr++;
+		}		
+		free(per_proc_per_vtx_count);
+	}
+	
+	int total_size = 0, grand_total_size=0;
+	for(i=0; i<total_no_proc; i++) {
+		per_proc_count_ptr[i] = total_size;
+		per_proc_count_start[i] = total_size;
+		total_size = total_size + per_proc_count[i];		
+		per_proc_count_end[i] = total_size;
+
+		per_proc_outedges_count_ptr[i] = grand_total_size;
+		per_proc_outedges_count_start[i] = grand_total_size;
+		grand_total_size = grand_total_size + per_proc_outedges_count[i];		
+		per_proc_outedges_count_end[i] = grand_total_size;
+	}
+
+	MPI_Barrier(MPI_COMM_WORLD);	
+
+	pr_int* source_nodes_for_proc = (pr_int*)malloc(total_size * sizeof(pr_int));
+	pr_int* source_nodes_for_proc_count = (pr_int*)malloc(total_size  * sizeof(pr_int));
+	pr_int* outedges_in_proc = (pr_int*)malloc(grand_total_size * sizeof(pr_int));
+	edge_ptr = 0;
+	for(vtx_ptr = 1; vtx_ptr <= graph->nvtxs; vtx_ptr++) {
+		pr_int curr_actual_vtx = graph->start_vertex + (vtx_ptr-1);
+		while(edge_ptr < graph->xadj[vtx_ptr]) {
+			pr_int endpoint = graph->nbrs[edge_ptr];
+			int owner_proc_id = calcOwnerProc(endpoint, graph->total_nvtxs, total_no_proc);			
+			int ptr = per_proc_count_ptr[owner_proc_id];
+			if( ptr==per_proc_count_start[owner_proc_id]  ||  source_nodes_for_proc[ptr-1]!=curr_actual_vtx ) {
+				source_nodes_for_proc_count[ptr] = 1;
+				source_nodes_for_proc[ptr] = curr_actual_vtx;				
+				per_proc_count_ptr[owner_proc_id]++;
+			}
+			else {
+				source_nodes_for_proc_count[ptr-1]++;
+			}						
+			outedges_in_proc[ per_proc_outedges_count_ptr[owner_proc_id]++ ] = endpoint;
+			edge_ptr++;
+		}
+	}
+	
+
+	/*
+	Perform testing to check if the setup is consistent with the actual data
+	*/
+	#if TEST_OUTGOING_TO_INCOMING				
+		if(rank_of_the_proc == total_no_proc-1) {
+			FILE * opFile_test = fopen("test_outgoing_to_incoming.txt", "w");
+			fprintf(opFile_test, "....................................... \n");
+			fclose(opFile_test);
+
+		}	
+		MPI_Barrier(MPI_COMM_WORLD);	
+		
+		for(i=0; i<total_no_proc; i++) {
+			if(rank_of_the_proc == i) {
+				FILE * opFile_test = fopen("test_outgoing_to_incoming.txt", "a");
+				int vtx_ptr = 0, edg_ptr = 0;
+				for(vtx_ptr=0; vtx_ptr<total_size; vtx_ptr++) {
+					while(source_nodes_for_proc_count[vtx_ptr]>0) {
+						fprintf(opFile_test, "%d, %d\n", source_nodes_for_proc[vtx_ptr], outedges_in_proc[edg_ptr]);
+						source_nodes_for_proc_count[vtx_ptr]--;
+						edg_ptr++;
+					}
+				}
+				fclose(opFile_test);
+			}				
+			MPI_Barrier(MPI_COMM_WORLD);
+		}					
+	#endif
+
+
+
+	/**********************************************************************
+		Perform exchange of information to convert outgoing to incoming
+	***********************************************************************/
+	int* per_proc_count_recv = (int*)calloc(total_no_proc, sizeof(int));	
+	int* per_proc_outedges_count_recv = (int*)calloc(total_no_proc, sizeof(int));
+	MPI_Alltoall( (void*)per_proc_count, 1, MPI_UNSIGNED, (void*)per_proc_count_recv, 1, MPI_UNSIGNED, MPI_COMM_WORLD);
+	MPI_Alltoall( (void*)per_proc_outedges_count, 1, MPI_UNSIGNED, (void*)per_proc_outedges_count_recv, 1, MPI_UNSIGNED, MPI_COMM_WORLD);
+
+	int* per_proc_count_disp = (int*)calloc(total_no_proc, sizeof(int));	
+	int* per_proc_outedges_count_disp = (int*)calloc(total_no_proc, sizeof(int));
+	int* per_proc_count_disp_recv = (int*)calloc(total_no_proc, sizeof(int));	
+	int* per_proc_outedges_count_disp_recv = (int*)calloc(total_no_proc, sizeof(int));
+	int startPosition = 0;
+	for(i=0; i<total_no_proc; i++) {
+		per_proc_count_disp[i] = startPosition;
+		startPosition = startPosition + per_proc_count[i];
+	}
+	startPosition = 0;
+	for(i=0; i<total_no_proc; i++) {
+		per_proc_outedges_count_disp[i] = startPosition;
+		startPosition = startPosition + per_proc_outedges_count[i];
+	}
+	startPosition = 0;
+	for(i=0; i<total_no_proc; i++) {
+		per_proc_count_disp_recv[i] = startPosition;
+		startPosition = startPosition + per_proc_count_recv[i];
+	}
+	startPosition = 0;
+	for(i=0; i<total_no_proc; i++) {
+		per_proc_outedges_count_disp_recv[i] = startPosition;
+		startPosition = startPosition + per_proc_outedges_count_recv[i];
+	}
+
+
+	for(i=0; i<total_no_proc; i++) {
+		if(rank_of_the_proc == i) {
+			printf("Rank %d : \n", i);
+			for(j=0; j<total_no_proc; j++) {
+				printf("%d, %d\n", per_proc_count_disp[j], per_proc_count[j]);
+				//printf("%d, %d\n", per_proc_count_disp_recv[j], per_proc_count_recv[j]);
+			}
+			printf("Rank %d : \n", i);
+			for(j=0; j<total_no_proc; j++) {
+				//printf("%d, %d\n", per_proc_count_disp[j], per_proc_count[j]);
+				printf("%d, %d\n", per_proc_count_disp_recv[j], per_proc_count_recv[j]);
+			}
+		}
+		MPI_Barrier(MPI_COMM_WORLD);	
+	}
+
+	
+	pr_int* source_nodes_for_proc_count_recv = (pr_int*)malloc(total_size * sizeof(pr_int));
+	pr_int* source_nodes_for_proc_recv = (pr_int*)malloc(total_size * sizeof(pr_int));
+	MPI_Alltoallv( (void*)source_nodes_for_proc, (void*)per_proc_count, (void*)per_proc_count_disp, MPI_UNSIGNED, (void*)source_nodes_for_proc_recv, (void*)per_proc_count_recv, (void*)per_proc_count_disp_recv, MPI_UNSIGNED, MPI_COMM_WORLD);
+	//MPI_Alltoallv( (void*)source_nodes_for_proc_count, (void*)per_proc_count, (void*)per_proc_count_disp, MPI_UNSIGNED, (void*)source_nodes_for_proc_count_recv, (void*)per_proc_count_recv, (void*)per_proc_count_disp_recv, MPI_UNSIGNED, MPI_COMM_WORLD);		
+	
+
+	free(per_proc_count_start);
+	free(per_proc_count_end);
 
 	MPI_Finalize();
 	return 0;
