@@ -525,6 +525,9 @@ int main(int argc, char *argv[]) {
 	/**********************************************************************
 		Page Rank !!!
 	***********************************************************************/		
+	MPI_Request reqs[2];
+	MPI_Status status;
+
 	int max_iterations = 100;
 	double const damping = 0.85;
 	double *PR = malloc(graph->nvtxs * sizeof(double));
@@ -537,10 +540,8 @@ int main(int argc, char *argv[]) {
   	double const tol = 1e-9;  
 
   	double* PR_accum;
-  	double* PR_send = (double*)malloc(total_size * sizeof(double));	
-  	printf("s %d\n", total_size);
-  	double* PR_recv = (double*)malloc(total_size_recv * sizeof(double));
-  	printf("r %d\n", total_size_recv);
+  	double* PR_send = (double*)malloc(total_size * sizeof(double));	  	
+  	double* PR_recv = (double*)malloc(total_size_recv * sizeof(double));  	
   	for(i=0; i < max_iterations; ++i) {
   		if(rank_of_the_proc==0) {
   			printf("Iterations : %d\n", i);
@@ -555,7 +556,17 @@ int main(int argc, char *argv[]) {
 		}
 
 	 	/* Perform AllToAllv */		
-		MPI_Alltoallv( (void*)PR_send, (void*)per_proc_count, (void*)per_proc_count_disp, MPI_DOUBLE, (void*)PR_recv, (void*)per_proc_count_recv, (void*)per_proc_count_disp_recv, MPI_DOUBLE, MPI_COMM_WORLD);		
+		// MPI_Alltoallv( (void*)PR_send, (void*)per_proc_count, (void*)per_proc_count_disp, MPI_DOUBLE, (void*)PR_recv, (void*)per_proc_count_recv, (void*)per_proc_count_disp_recv, MPI_DOUBLE, MPI_COMM_WORLD);		
+		for(j=1; j<=total_no_proc; j++) {			
+			int send_pos = (rank_of_the_proc + j) % total_no_proc;
+			MPI_Isend(PR_send + per_proc_count_disp[send_pos], per_proc_count[send_pos], MPI_DOUBLE, send_pos, 1, MPI_COMM_WORLD, &reqs[0]);	
+			int recv_pos = (rank_of_the_proc - j + total_no_proc) % total_no_proc;
+			MPI_Irecv(PR_recv + per_proc_count_disp_recv[recv_pos], per_proc_count_recv[recv_pos], MPI_DOUBLE, recv_pos, 1, MPI_COMM_WORLD, &reqs[1]);			
+
+			int r=0;
+			for(r=0;r<2;r++)
+				MPI_Wait(&reqs[r], &status);
+		}
 
 		/* Accumulate */
 		int vtx_ptr = 0, edg_ptr = 0;

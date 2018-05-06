@@ -50,11 +50,11 @@ double * pagerank(
 
 
   /* Convergence tolerance. */
-  double const tol = 1e-12;
+  double const tol = 1e-9;
 
   double * PR_accum = malloc(nvtxs * sizeof(*PR));
   for(int i=0; i < max_iterations; ++i) {
-
+    printf("Iterations : %d\n", i);
     for(pr_int v=0; v < nvtxs; ++v) {
       PR_accum[v] = 0.;
     }
