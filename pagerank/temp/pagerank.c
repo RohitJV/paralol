@@ -29,6 +29,69 @@ void print_time(double const seconds) {
 
 double startTime1, startTime2;
 
+
+/**
+* @brief Compute the PageRank (PR) of a graph.
+*
+* @param graph The graph.
+* @param damping Damping factor (or, 1-restart). 0.85 is typical.
+* @param max_iterations The maximium number of iterations to perform.
+*
+* @return A vector of PR values.
+*/
+double * pagerank(
+    pr_graph const * const graph,
+    double const damping,
+    int const max_iterations);
+
+
+int main(
+    int argc,
+    char * * argv)
+{
+  if(argc == 1) {
+    fprintf(stderr, "usage: %s <graph> [output file]\n", *argv);
+    return EXIT_FAILURE;
+  }
+
+  char * ifname = argv[1];
+  char * ofname = NULL;
+  if(argc > 2) {
+    ofname = argv[2];
+  }
+
+  pr_graph * graph = pr_graph_load(ifname);
+  if(!graph) {
+    return EXIT_FAILURE;
+  }
+
+  startTime2 = monotonic_seconds();
+
+  double * PR = pagerank(graph, 0.85, 100);
+
+  double endTime = monotonic_seconds();
+  printf("Total time : %f\n", endTime - startTime2);
+
+  /* write pagerank values */
+  if(ofname) {
+    FILE * fout = fopen(ofname, "w");
+    if(!fout) {
+      fprintf(stderr, "ERROR: could not open '%s' for writing.\n", ofname);
+      return EXIT_FAILURE;
+    }
+    for(pr_int v=0; v < graph->nvtxs; ++v) {
+      fprintf(fout, "%0.3e\n", PR[v]);
+    }
+    fclose(fout);
+  }
+
+  free(PR);
+
+  return EXIT_SUCCESS;
+}
+
+
+
 double * pagerank(
     pr_graph const * const graph,
     double const damping,
@@ -54,7 +117,7 @@ double * pagerank(
 
   double * PR_accum = malloc(nvtxs * sizeof(*PR));
   for(int i=0; i < max_iterations; ++i) {
-    printf("Iterations : %d\n", i);
+    printf("%d\n", i);
     for(pr_int v=0; v < nvtxs; ++v) {
       PR_accum[v] = 0.;
     }
@@ -84,54 +147,6 @@ double * pagerank(
     }
   }
 
-  free(PR_accum);  
+  free(PR_accum);
   return PR;
-}
-
-
-int main(
-    int argc,
-    char * * argv)
-{
-  startTime1 = monotonic_seconds();
-  if(argc == 1) {
-    fprintf(stderr, "usage: %s <graph> [output file]\n", *argv);
-    return EXIT_FAILURE;
-  }
-
-  char * ifname = argv[1];
-  char * ofname = NULL;
-  if(argc > 2) {
-    ofname = argv[2];
-  }
-
-  pr_graph * graph = pr_graph_load(ifname);  
-  if(!graph) {
-    return EXIT_FAILURE;
-  }
-
-  startTime2 = monotonic_seconds();
-
-  double * PR = pagerank(graph, 0.85, 100);
-
-  double endTime = monotonic_seconds();
-  printf("Global Execution Time : %f\n", endTime - startTime1);
-  printf("Algorithm Execution Time : %f\n", endTime - startTime2);
-  
-  /* write pagerank values */
-  if(ofname) {
-    FILE * fout = fopen(ofname, "w");
-    if(!fout) {
-      fprintf(stderr, "ERROR: could not open '%s' for writing.\n", ofname);
-      return EXIT_FAILURE;
-    }
-    for(pr_int v=0; v < graph->nvtxs; ++v) {
-      fprintf(fout, "%0.3e\n", PR[v]);
-    }
-    fclose(fout);
-  }
-
-  free(PR);  
-
-  return EXIT_SUCCESS;
 }

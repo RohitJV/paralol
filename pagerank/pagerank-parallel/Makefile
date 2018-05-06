@@ -1,6 +1,6 @@
 pagerank-parallel: pagerank-parallel.c pr_graph.c
 	mpicc -lm pagerank-parallel.c -o pagerank-parallel				
-	mpirun -np 2 ./pagerank-parallel A.graph A.pr.txt		
+	mpirun -np 16 ./pagerank-parallel A.graph A.pr.txt		
  
 pagerank-parallel-improved: pagerank-parallel-improved.c pr_graph.c
 	mpicc -lm pagerank-parallel-improved.c -o pagerank-parallel-improved				
