@@ -563,21 +563,50 @@ int main(int argc, char *argv[]) {
 			int recv_pos = (rank_of_the_proc - j + total_no_proc) % total_no_proc;
 			MPI_Irecv(PR_recv + per_proc_count_disp_recv[recv_pos], per_proc_count_recv[recv_pos], MPI_DOUBLE, recv_pos, 1, MPI_COMM_WORLD, &reqs[1]);			
 
+			int cur_send_pos = (rank_of_the_proc + j - 1) % total_no_proc;
+			int cur_recv_pos = (rank_of_the_proc - j + 1 + total_no_proc) % total_no_proc;
+
+			int k=0;
+			if(j==1) {
+				int edg_ptr = per_proc_outedges_count_disp[cur_send_pos];
+				for(k=0; k<per_proc_count[cur_send_pos]; k++) {
+					int vtx_ptr = k + per_proc_count_disp[cur_send_pos];
+					int temp_ctr = source_nodes_for_proc_count[vtx_ptr];					
+					while(temp_ctr > 0) {
+						PR_accum[ outedges_in_proc[edg_ptr] - graph->start_vertex ] += PR_send[vtx_ptr];
+						temp_ctr--;		
+						edg_ptr++;				
+					}
+				}			
+			}
+			else {
+				int edg_ptr = per_proc_outedges_count_disp_recv[cur_recv_pos];
+				for(k=0; k<per_proc_count_recv[cur_recv_pos]; k++) {
+					int vtx_ptr = k + per_proc_count_disp_recv[cur_recv_pos];
+					int temp_ctr = source_nodes_for_proc_count_recv[vtx_ptr];					
+					while(temp_ctr > 0) {
+						PR_accum[ outedges_in_proc_recv[edg_ptr] - graph->start_vertex ] += PR_recv[vtx_ptr];
+						temp_ctr--;		
+						edg_ptr++;				
+					}
+				}
+			}
+
 			int r=0;
 			for(r=0;r<2;r++)
 				MPI_Wait(&reqs[r], &status);
 		}
 
 		/* Accumulate */
-		int vtx_ptr = 0, edg_ptr = 0;
-		for(vtx_ptr=0; vtx_ptr<total_size_recv; vtx_ptr++) {
-			int temp_ctr = source_nodes_for_proc_count_recv[vtx_ptr];
-			while(temp_ctr>0) {				
-				PR_accum[ outedges_in_proc_recv[edg_ptr] - graph->start_vertex ] += PR_recv[vtx_ptr];
-				temp_ctr--;
-				edg_ptr++;
-			}			
-		}				
+		// int vtx_ptr = 0, edg_ptr = 0;
+		// for(vtx_ptr=0; vtx_ptr<total_size_recv; vtx_ptr++) {
+		// 	int temp_ctr = source_nodes_for_proc_count_recv[vtx_ptr];
+		// 	while(temp_ctr>0) {				
+		// 		PR_accum[ outedges_in_proc_recv[edg_ptr] - graph->start_vertex ] += PR_recv[vtx_ptr];
+		// 		temp_ctr--;
+		// 		edg_ptr++;
+		// 	}			
+		// }				
 		
 		/* Finalize new PR values */		
 	    double norm_changed = 0.;
