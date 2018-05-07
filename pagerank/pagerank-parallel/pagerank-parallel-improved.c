@@ -605,7 +605,8 @@ int main(int argc, char *argv[]) {
     pr_int* edg_ptr = outedges_in_proc_recv;
     double* vtx_ptr = PR_recv;
     int* temp_ptr = source_nodes_for_proc_count_recv;
-		for(cnt=0; cnt<total_size_recv; cnt++) {
+    cnt = total_size_recv;
+		while(cnt--) {
 			// int temp_ctr = source_nodes_for_proc_count_recv[cnt];
       int temp_ctr = *(temp_ptr)++;
       double val = *(vtx_ptr)++;
@@ -613,7 +614,7 @@ int main(int argc, char *argv[]) {
 				*( PR_accum + (*(edg_ptr)++) ) += val;
 			}
 		}
-    // printf("Count : %d\n", cnt);
+    //printf("Count : %d\n", cnt);
     e1 = monotonic_seconds();
     if(rank_of_the_proc == 0) {
       printf("%f\n", e1-s1);
