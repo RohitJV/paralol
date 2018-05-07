@@ -518,7 +518,7 @@ int main(int argc, char *argv[]) {
 	MPI_Barrier(MPI_COMM_WORLD);
 	if(rank_of_the_proc==0) {
 	  	double endTime = monotonic_seconds();
-		printf("Execution Time till converting edges : %f\n", endTime - startTime);
+		// printf("Execution Time till converting edges : %f\n", endTime - startTime);
 		startTime2 = monotonic_seconds();
 	}
 
@@ -542,10 +542,7 @@ int main(int argc, char *argv[]) {
   	double* PR_accum;
   	double* PR_send = (double*)malloc(total_size * sizeof(double));
   	double* PR_recv = (double*)malloc(total_size_recv * sizeof(double));
-  	for(i=0; i < max_iterations; ++i) {
-  		if(rank_of_the_proc==0) {
-  			printf("Iterations : %d\n", i);
-  		}
+  	for(i=0; i < max_iterations; ++i) {  		
   		pr_int v;
 		PR_accum = calloc(sizeof(double), graph->nvtxs);
 
@@ -557,77 +554,29 @@ int main(int argc, char *argv[]) {
 
 	 	/* Perform AllToAllv */
 		MPI_Alltoallv( (void*)PR_send, (void*)per_proc_count, (void*)per_proc_count_disp, MPI_DOUBLE, (void*)PR_recv, (void*)per_proc_count_recv, (void*)per_proc_count_disp_recv, MPI_DOUBLE, MPI_COMM_WORLD);
-		// for(j=1; j<=total_no_proc; j++) {
-		// 	double s1,s2,e1,e2,s3,e3;
-		// 	s1 = monotonic_seconds();
-		// 	int send_pos = (rank_of_the_proc + j) % total_no_proc;
-		// 	MPI_Isend(PR_send + per_proc_count_disp[send_pos], per_proc_count[send_pos], MPI_DOUBLE, send_pos, 1, MPI_COMM_WORLD, &reqs[0]);
-		// 	int recv_pos = (rank_of_the_proc - j + total_no_proc) % total_no_proc;
-		// 	MPI_Irecv(PR_recv + per_proc_count_disp_recv[recv_pos], per_proc_count_recv[recv_pos], MPI_DOUBLE, recv_pos, 1, MPI_COMM_WORLD, &reqs[1]);
-    //
-		// 	int cur_send_pos = (rank_of_the_proc + j - 1) % total_no_proc;
-		// 	int cur_recv_pos = (rank_of_the_proc - j + 1 + total_no_proc) % total_no_proc;
-    //
-		// 	s2 = monotonic_seconds();
-		// 	int k=0;
-		// 	if(j==1) {
-		// 		int edg_ptr = per_proc_outedges_count_disp[cur_send_pos];
-		// 		for(k=0; k<per_proc_count[cur_send_pos]; k++) {
-		// 			int vtx_ptr = k + per_proc_count_disp[cur_send_pos];
-		// 			int temp_ctr = source_nodes_for_proc_count[vtx_ptr];
-		// 			while(temp_ctr > 0) {
-		// 				PR_accum[ outedges_in_proc[edg_ptr] - graph->start_vertex ] += PR_send[vtx_ptr];
-		// 				temp_ctr--;
-		// 				edg_ptr++;
-		// 			}
-		// 		}
-		// 	}
-		// 	else {
-		// 		int edg_ptr = per_proc_outedges_count_disp_recv[cur_recv_pos];
-		// 		for(k=0; k<per_proc_count_recv[cur_recv_pos]; k++) {
-		// 			int vtx_ptr = k + per_proc_count_disp_recv[cur_recv_pos];
-		// 			int temp_ctr = source_nodes_for_proc_count_recv[vtx_ptr];
-		// 			while(temp_ctr > 0) {
-		// 				PR_accum[ outedges_in_proc_recv[edg_ptr] - graph->start_vertex ] += PR_recv[vtx_ptr];
-		// 				temp_ctr--;
-		// 				edg_ptr++;
-		// 			}
-		// 		}
-		// 	}
-    //
-		// 	e1 = monotonic_seconds();
-		// 	int r=0;
-		// 	for(r=0;r<2;r++)
-		// 		MPI_Wait(&reqs[r], &status);
-		// 	e2 = monotonic_seconds();
-		// 	if(rank_of_the_proc==2) {
-		// 		printf("Total time : %f\n", e2-s2);
-		// 		printf("Computation : %f\n", e1-s1);
-		// 	}
-		// }
-
-    /* Accumulate */
-    double s1,s2,e1,e2,s3,e3;
-    s1 = monotonic_seconds();
-		// int vtx_ptr = 0;
-    pr_int cnt = 0;
-    pr_int* edg_ptr = outedges_in_proc_recv;
-    double* vtx_ptr = PR_recv;
-    int* temp_ptr = source_nodes_for_proc_count_recv;
-    cnt = total_size_recv;
-		while(cnt--) {
-			// int temp_ctr = source_nodes_for_proc_count_recv[cnt];
-      int temp_ctr = *(temp_ptr)++;
-      double val = *(vtx_ptr)++;
-			while(temp_ctr--) {
-				*( PR_accum + (*(edg_ptr)++) ) += val;
+		
+	    /* Accumulate */
+	    double s1,s2,e1,e2,s3,e3;
+	    // s1 = monotonic_seconds();
+			// int vtx_ptr = 0;
+	    pr_int cnt = 0;
+	    pr_int* edg_ptr = outedges_in_proc_recv;
+	    double* vtx_ptr = PR_recv;
+	    int* temp_ptr = source_nodes_for_proc_count_recv;
+	    cnt = total_size_recv;
+			while(cnt--) {
+				// int temp_ctr = source_nodes_for_proc_count_recv[cnt];
+	      int temp_ctr = *(temp_ptr)++;
+	      double val = *(vtx_ptr)++;
+				while(temp_ctr--) {
+					*( PR_accum + (*(edg_ptr)++) ) += val;
+				}
 			}
-		}
-    //printf("Count : %d\n", cnt);
-    e1 = monotonic_seconds();
-    if(rank_of_the_proc == 0) {
-      printf("%f\n", e1-s1);
-    }
+	    //printf("Count : %d\n", cnt);
+	    // e1 = monotonic_seconds();
+	    // if(rank_of_the_proc == 0) {
+	    //   printf("%f\n", e1-s1);
+	    // }
 
 
 		/* Finalize new PR values */
@@ -647,9 +596,8 @@ int main(int argc, char *argv[]) {
 
 	MPI_Barrier(MPI_COMM_WORLD);
 	if(rank_of_the_proc==0) {
-	  	double endTime = monotonic_seconds();
-		printf("Global Execution Time : %f\n", endTime - startTime);
-		printf("Pagerank execution : %f\n", endTime - startTime2);
+	  	double endTime = monotonic_seconds();		
+		printf("Pagerank Execution Time : %f\n", endTime - startTime2);
 	}
 
   	for(i=0; i<total_no_proc; i++) {
