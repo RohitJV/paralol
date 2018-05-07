@@ -3,7 +3,7 @@ pagerank-parallel: pagerank-parallel.c pr_graph.c
 	mpirun -np 16 ./pagerank-parallel A.graph A.pr.txt
 
 pagerank-parallel-improved: pagerank-parallel-improved.c pr_graph.c
-	mpicc -lm pagerank-parallel-improved.c -o pagerank-parallel-improved
+	mpicc -std=c99 -march=native -O3 -Wall -Wno-unused-result -lm pagerank-parallel-improved.c -o pagerank-parallel-improved
 	mpirun -np 16 ./pagerank-parallel-improved A.graph A.pr.txt
 
 pagerank: pagerank.c pr_graph.c
