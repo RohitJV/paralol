@@ -48,9 +48,6 @@ static inline double monotonic_seconds() {
 *
 * @param seconds Seconds spent on execution, excluding IO.
 */
-static void print_time(double const seconds) {
-  printf("Execution time: %0.04fs\n", seconds);
-}
 double startTime, endTime;
 
 int cmpfunc (const void * a, const void * b) {
@@ -59,20 +56,14 @@ int cmpfunc (const void * a, const void * b) {
 
 void print_graph(pr_graph * graph) {
 	/*
-	Print stuff to console.
-	*/
-	// printf("Vertices : %d\n", graph->nvtxs);
-	// printf("Size of the object : %d\n", sizeof(*graph));
-
-	/*
 	Print stuff to file.
 	*/
 	FILE * opFile = fopen("test_chunking.txt", "a");
-	int i, start_vertex = graph->start_vertex;
+	int i;
 	int edge_ptr = 0;
 	for(i=1; i <= graph->nvtxs; i++) {
 		while (edge_ptr < graph->xadj[i]) {
-			fprintf(opFile, "%d ", graph->nbrs[edge_ptr]+1);
+			fprintf(opFile, "%lu ", graph->nbrs[edge_ptr]+1);
 			edge_ptr++;
 		}
 		fprintf(opFile, "\n");
@@ -83,12 +74,6 @@ void print_graph(pr_graph * graph) {
 
 void print_edges(pr_graph * graph) {
 	/*
-	Print stuff to console.
-	*/
-	// printf("Vertices : %d\n", graph->nvtxs);
-	// printf("Size of the object : %d\n", sizeof(*graph));
-
-	/*
 	Print stuff to file.
 	*/
 	FILE * opFile = fopen("test_outgoing_to_incoming_main.txt", "a");
@@ -96,7 +81,7 @@ void print_edges(pr_graph * graph) {
 	int edge_ptr = 0;
 	for(i=1; i <= graph->nvtxs; i++) {
 		while (edge_ptr < graph->xadj[i]) {
-			fprintf(opFile, "%d, %d\n", start_vertex + (i-1), graph->nbrs[edge_ptr]);
+			fprintf(opFile, "%d, %lu\n", start_vertex + (i-1), graph->nbrs[edge_ptr]);
 			edge_ptr++;
 		}
 	}
@@ -151,12 +136,7 @@ void distributeVertices(FILE * fin, pr_int nvtxs, pr_int nedges, pr_graph **last
   	#endif
 
   	/* Divide the vertices */
-  	for(cur_proc_rank = 0; cur_proc_rank < total_no_proc; cur_proc_rank++) {
-  		/*
-  		Set the flag to true; if it true after the while loop, then that means the graph hasn't yet been reallocated
-  		*/
-  		int flag = 1;
-
+  	for(cur_proc_rank = 0; cur_proc_rank < total_no_proc; cur_proc_rank++) {  		
   		/*
 	  	Initialize the graph
 	  	*/
@@ -228,8 +208,7 @@ void distributeVertices(FILE * fin, pr_int nvtxs, pr_int nedges, pr_graph **last
 					*last_proc_graph = graph;
 				}
 		    	prev_e = edge_count;
-		    	prev_v = v;
-		    	flag = 0;
+		    	prev_v = v;		    	
 		    	break;
 		    }
   		}
@@ -244,14 +223,14 @@ int main(int argc, char *argv[]) {
 		return 0;
 	}
 
-	double startTime = monotonic_seconds(), startTime2;
+	double startTime2;
 
 	MPI_Init(&argc, &argv);
-	int total_no_proc, rank_of_the_proc, i=0, j=0, k=0;
+	int total_no_proc, rank_of_the_proc, i=0, j=0;
 	MPI_Comm_size(MPI_COMM_WORLD, &total_no_proc);
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank_of_the_proc);
 
-	int nvtxs, nedges, max_val = nvtxs+1000;
+	int nvtxs, nedges;
 	pr_graph * graph = malloc(sizeof(*graph));
 	char * ifname, * ofname;
 	if(argc == 1) {
@@ -276,9 +255,7 @@ int main(int argc, char *argv[]) {
 	  	FILE * fin = fopen(ifname, "r");
 		fscanf(fin, "%d", &nvtxs);
 		fscanf(fin, "%d", &nedges);
-		fscanf(fin, "\n"); /* make sure we process the newline, too. */
-
-		// printf("vertices: %d, edges: %d\n", nvtxs, nedges);
+		fscanf(fin, "\n"); /* make sure we process the newline, too. */		
 
 	  	distributeVertices(fin, nvtxs, nedges, &graph);
 
@@ -516,18 +493,13 @@ int main(int argc, char *argv[]) {
 
 
 	MPI_Barrier(MPI_COMM_WORLD);
-	if(rank_of_the_proc==0) {
-	  	double endTime = monotonic_seconds();
-		// printf("Execution Time till converting edges : %f\n", endTime - startTime);
+	if(rank_of_the_proc==0) {	  		
 		startTime2 = monotonic_seconds();
 	}
 
 	/**********************************************************************
 		Page Rank !!!
-	***********************************************************************/
-	MPI_Request reqs[2];
-	MPI_Status status;
-
+	***********************************************************************/	
 	int max_iterations = 100;
 	double const damping = 0.85;
 	double *PR = malloc(graph->nvtxs * sizeof(double));
@@ -555,29 +527,18 @@ int main(int argc, char *argv[]) {
 	 	/* Perform AllToAllv */
 		MPI_Alltoallv( (void*)PR_send, (void*)per_proc_count, (void*)per_proc_count_disp, MPI_DOUBLE, (void*)PR_recv, (void*)per_proc_count_recv, (void*)per_proc_count_disp_recv, MPI_DOUBLE, MPI_COMM_WORLD);
 		
-	    /* Accumulate */
-	    double s1,s2,e1,e2,s3,e3;
-	    // s1 = monotonic_seconds();
-			// int vtx_ptr = 0;
+	    /* Accumulate */	    	   
 	    pr_int cnt = 0;
 	    pr_int* edg_ptr = outedges_in_proc_recv;
 	    double* vtx_ptr = PR_recv;
 	    pr_int* temp_ptr = source_nodes_for_proc_count_recv;
 	    cnt = total_size_recv;
-			while(cnt--) {
-				// int temp_ctr = source_nodes_for_proc_count_recv[cnt];
-	      pr_int temp_ctr = *(temp_ptr)++;
-	      double val = *(vtx_ptr)++;
-				while(temp_ctr--) {
-					*( PR_accum + (*(edg_ptr)++) ) += val;
-				}
-			}
-	    //printf("Count : %d\n", cnt);
-	    // e1 = monotonic_seconds();
-	    // if(rank_of_the_proc == 0) {
-	    //   printf("%f\n", e1-s1);
-	    // }
-
+		while(cnt--) {				
+	      	pr_int temp_ctr = *(temp_ptr)++;
+	      	double val = *(vtx_ptr)++;
+			while(temp_ctr--)
+				*( PR_accum + (*(edg_ptr)++) ) += val;			
+		}	  
 
 		/* Finalize new PR values */
 	    double norm_changed = 0.;
