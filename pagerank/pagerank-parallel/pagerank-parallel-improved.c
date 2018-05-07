@@ -610,8 +610,8 @@ int main(int argc, char *argv[]) {
       int temp_ctr = *(temp_ptr)++;
       double val = *(vtx_ptr)++;
 			while(temp_ctr--) {
-				PR_accum[ *(edg_ptr)++ ] += val;
-			}      
+				*( PR_accum + (*(edg_ptr)++) ) += val;
+			}
 		}
     // printf("Count : %d\n", cnt);
     e1 = monotonic_seconds();
