@@ -604,14 +604,14 @@ int main(int argc, char *argv[]) {
     pr_int cnt = 0;
     pr_int* edg_ptr = outedges_in_proc_recv;
     double* vtx_ptr = PR_recv;
+    int* temp_ptr = source_nodes_for_proc_count_recv;
 		for(cnt=0; cnt<total_size_recv; cnt++) {
-			int temp_ctr = source_nodes_for_proc_count_recv[cnt];
-      double val = *vtx_ptr;
+			// int temp_ctr = source_nodes_for_proc_count_recv[cnt];
+      int temp_ctr = *(temp_ptr)++;
+      double val = *(vtx_ptr)++;
 			while(temp_ctr--) {
-				PR_accum[ *edg_ptr ] += val;
-        edg_ptr++;
-			}
-      vtx_ptr++;
+				PR_accum[ *(edg_ptr)++ ] += val;
+			}      
 		}
     // printf("Count : %d\n", cnt);
     e1 = monotonic_seconds();
