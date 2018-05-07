@@ -60,14 +60,21 @@ double * pagerank(
     }
 
     /* Each vertex pushes PR contribution to all outgoing links */
+    double s1,s2,e1,e2,s3,e3;
+    s1 = monotonic_seconds();
+    int cnt = 0;
     for(pr_int v=0; v < nvtxs; ++v) {
       double const num_links = (double)(xadj[v+1] - xadj[v]);
       double const pushing_val = PR[v] / num_links;
 
       for(pr_int e=xadj[v]; e < xadj[v+1]; ++e) {
         PR_accum[nbrs[e]] += pushing_val;
+        cnt++;
       }
     }
+    printf("Count : %d\n", cnt);
+    e1 = monotonic_seconds();
+    printf("%f\n", e1-s1);
 
     /* Finalize new PR values */
     double norm_changed = 0.;
@@ -84,7 +91,7 @@ double * pagerank(
     }
   }
 
-  free(PR_accum);  
+  free(PR_accum);
   return PR;
 }
 
@@ -105,7 +112,7 @@ int main(
     ofname = argv[2];
   }
 
-  pr_graph * graph = pr_graph_load(ifname);  
+  pr_graph * graph = pr_graph_load(ifname);
   if(!graph) {
     return EXIT_FAILURE;
   }
@@ -117,7 +124,7 @@ int main(
   double endTime = monotonic_seconds();
   printf("Global Execution Time : %f\n", endTime - startTime1);
   printf("Algorithm Execution Time : %f\n", endTime - startTime2);
-  
+
   /* write pagerank values */
   if(ofname) {
     FILE * fout = fopen(ofname, "w");
@@ -131,7 +138,7 @@ int main(
     fclose(fout);
   }
 
-  free(PR);  
+  free(PR);
 
   return EXIT_SUCCESS;
 }
