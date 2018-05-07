@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-typedef uint64_t pr_int;
+typedef uint32_t pr_int;
 
 
 /**

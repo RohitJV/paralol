@@ -116,12 +116,12 @@ void send_graph(pr_graph * graph, int cur_proc_rank) {
 	MPI_Comm_size(MPI_COMM_WORLD, &total_no_proc);
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank_of_the_proc);
 
-  	MPI_Bcast( (void*)&(graph->total_nvtxs), 1, MPI_UNSIGNED_LONG_LONG, total_no_proc-1, MPI_COMM_WORLD );
-  	MPI_Send( (void*)&(graph->nvtxs), 1,  MPI_UNSIGNED_LONG_LONG, cur_proc_rank, 0, MPI_COMM_WORLD);
-  	MPI_Send( (void*)&(graph->nedges), 1,  MPI_UNSIGNED_LONG_LONG, cur_proc_rank, 0, MPI_COMM_WORLD);
-  	MPI_Send( (void*)&(graph->start_vertex), 1,  MPI_UNSIGNED_LONG_LONG, cur_proc_rank, 0, MPI_COMM_WORLD);
-  	MPI_Send( (void*)graph->xadj, graph->nvtxs + 1, MPI_UNSIGNED_LONG_LONG, cur_proc_rank, 0, MPI_COMM_WORLD);
-  	MPI_Send( (void*)graph->nbrs, graph->nedges, MPI_UNSIGNED_LONG_LONG, cur_proc_rank, 0, MPI_COMM_WORLD);
+  	MPI_Bcast( (void*)&(graph->total_nvtxs), 1, MPI_UNSIGNED, total_no_proc-1, MPI_COMM_WORLD );
+  	MPI_Send( (void*)&(graph->nvtxs), 1,  MPI_UNSIGNED, cur_proc_rank, 0, MPI_COMM_WORLD);
+  	MPI_Send( (void*)&(graph->nedges), 1,  MPI_UNSIGNED, cur_proc_rank, 0, MPI_COMM_WORLD);
+  	MPI_Send( (void*)&(graph->start_vertex), 1,  MPI_UNSIGNED, cur_proc_rank, 0, MPI_COMM_WORLD);
+  	MPI_Send( (void*)graph->xadj, graph->nvtxs + 1, MPI_UNSIGNED, cur_proc_rank, 0, MPI_COMM_WORLD);
+  	MPI_Send( (void*)graph->nbrs, graph->nedges, MPI_UNSIGNED, cur_proc_rank, 0, MPI_COMM_WORLD);
 }
 
 pr_int calcOwnerProc(pr_int endpoint, pr_int total_nvtxs, int total_no_proc) {
@@ -298,14 +298,14 @@ int main(int argc, char *argv[]) {
 
 	  	MPI_Status recv_status;
 
-	  	MPI_Bcast( (void*)&(graph->total_nvtxs), 1, MPI_UNSIGNED_LONG_LONG, total_no_proc-1, MPI_COMM_WORLD );
-		MPI_Recv( (void*)&(graph->nvtxs), 1, MPI_UNSIGNED_LONG_LONG, total_no_proc - 1, 0, MPI_COMM_WORLD, &recv_status);
-		MPI_Recv( (void*)&(graph->nedges), 1, MPI_UNSIGNED_LONG_LONG, total_no_proc - 1, 0, MPI_COMM_WORLD, &recv_status);
-		MPI_Recv( (void*)&(graph->start_vertex), 1, MPI_UNSIGNED_LONG_LONG, total_no_proc - 1, 0, MPI_COMM_WORLD, &recv_status);
+	  	MPI_Bcast( (void*)&(graph->total_nvtxs), 1, MPI_UNSIGNED, total_no_proc-1, MPI_COMM_WORLD );
+		MPI_Recv( (void*)&(graph->nvtxs), 1, MPI_UNSIGNED, total_no_proc - 1, 0, MPI_COMM_WORLD, &recv_status);
+		MPI_Recv( (void*)&(graph->nedges), 1, MPI_UNSIGNED, total_no_proc - 1, 0, MPI_COMM_WORLD, &recv_status);
+		MPI_Recv( (void*)&(graph->start_vertex), 1, MPI_UNSIGNED, total_no_proc - 1, 0, MPI_COMM_WORLD, &recv_status);
 		graph->xadj = malloc((graph->nvtxs + 1) * sizeof(*graph->xadj));
 	  	graph->nbrs = malloc(graph->nedges * sizeof(*graph->nbrs));
-		MPI_Recv( (void*)(graph->xadj), graph->nvtxs + 1, MPI_UNSIGNED_LONG_LONG, total_no_proc - 1, 0, MPI_COMM_WORLD, &recv_status);
-		MPI_Recv( (void*)(graph->nbrs), graph->nedges, MPI_UNSIGNED_LONG_LONG, total_no_proc - 1, 0, MPI_COMM_WORLD, &recv_status);
+		MPI_Recv( (void*)(graph->xadj), graph->nvtxs + 1, MPI_UNSIGNED, total_no_proc - 1, 0, MPI_COMM_WORLD, &recv_status);
+		MPI_Recv( (void*)(graph->nbrs), graph->nedges, MPI_UNSIGNED, total_no_proc - 1, 0, MPI_COMM_WORLD, &recv_status);
 	}
 	MPI_Barrier(MPI_COMM_WORLD);
 
@@ -447,7 +447,7 @@ int main(int argc, char *argv[]) {
 	***********************************************************************/
 	int* per_proc_count_recv = (int*)calloc(total_no_proc, sizeof(int));
 	int* per_proc_outedges_count_recv = (int*)calloc(total_no_proc, sizeof(int));
-	MPI_Alltoall( (void*)per_proc_count, 1, MPI_UNSIGNED_LONG_LONG, (void*)per_proc_count_recv, 1, MPI_UNSIGNED, MPI_COMM_WORLD);
+	MPI_Alltoall( (void*)per_proc_count, 1, MPI_UNSIGNED, (void*)per_proc_count_recv, 1, MPI_UNSIGNED, MPI_COMM_WORLD);
 	MPI_Alltoall( (void*)per_proc_outedges_count, 1, MPI_UNSIGNED, (void*)per_proc_outedges_count_recv, 1, MPI_UNSIGNED, MPI_COMM_WORLD);
 
 	int* per_proc_count_disp = (int*)calloc(total_no_proc, sizeof(int));
@@ -480,11 +480,11 @@ int main(int argc, char *argv[]) {
 	int grand_total_size_recv = startPosition;
 
 	pr_int* source_nodes_for_proc_recv = (pr_int*)malloc(total_size_recv * sizeof(pr_int));
-	MPI_Alltoallv( (void*)source_nodes_for_proc, (void*)per_proc_count, (void*)per_proc_count_disp, MPI_UNSIGNED_LONG_LONG, (void*)source_nodes_for_proc_recv, (void*)per_proc_count_recv, (void*)per_proc_count_disp_recv, MPI_UNSIGNED_LONG_LONG, MPI_COMM_WORLD);
+	MPI_Alltoallv( (void*)source_nodes_for_proc, (void*)per_proc_count, (void*)per_proc_count_disp, MPI_UNSIGNED, (void*)source_nodes_for_proc_recv, (void*)per_proc_count_recv, (void*)per_proc_count_disp_recv, MPI_UNSIGNED, MPI_COMM_WORLD);
 	pr_int* source_nodes_for_proc_count_recv = (pr_int*)malloc(total_size_recv * sizeof(pr_int));
-	MPI_Alltoallv( (void*)source_nodes_for_proc_count, (void*)per_proc_count, (void*)per_proc_count_disp, MPI_UNSIGNED_LONG_LONG, (void*)source_nodes_for_proc_count_recv, (void*)per_proc_count_recv, (void*)per_proc_count_disp_recv, MPI_UNSIGNED_LONG_LONG, MPI_COMM_WORLD);
+	MPI_Alltoallv( (void*)source_nodes_for_proc_count, (void*)per_proc_count, (void*)per_proc_count_disp, MPI_UNSIGNED, (void*)source_nodes_for_proc_count_recv, (void*)per_proc_count_recv, (void*)per_proc_count_disp_recv, MPI_UNSIGNED, MPI_COMM_WORLD);
 	pr_int* outedges_in_proc_recv = (pr_int*)malloc(grand_total_size_recv * sizeof(pr_int));
-	MPI_Alltoallv( (void*)outedges_in_proc, (void*)per_proc_outedges_count, (void*)per_proc_outedges_count_disp, MPI_UNSIGNED_LONG_LONG, (void*)outedges_in_proc_recv, (void*)per_proc_outedges_count_recv, (void*)per_proc_outedges_count_disp_recv, MPI_UNSIGNED_LONG_LONG, MPI_COMM_WORLD);
+	MPI_Alltoallv( (void*)outedges_in_proc, (void*)per_proc_outedges_count, (void*)per_proc_outedges_count_disp, MPI_UNSIGNED, (void*)outedges_in_proc_recv, (void*)per_proc_outedges_count_recv, (void*)per_proc_outedges_count_disp_recv, MPI_UNSIGNED, MPI_COMM_WORLD);
 
 
 	#if TEST_POST_COMMUNICATION
