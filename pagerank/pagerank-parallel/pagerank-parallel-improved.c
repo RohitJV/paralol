@@ -48,17 +48,6 @@ int cmpfunc (const void * a, const void * b) {
    return ( *(pr_int*)a > *(pr_int*)b ? 1 : -1);
 }
 
-/*
-TODO - Try to modify so that the list size is allocated dynamically
-*/
-void addToList(pr_int* list, pr_int x, pr_int *count) {
-	if(list == NULL)
-		list = (pr_int *)malloc(DEFAULT_LIST_SIZE * sizeof(pr_int));						
-	list[*count] = x;
-	*count = *count + 1;
-}
-
-
 void print_graph(pr_graph * graph) {
 	/*
 	Print stuff to console.
@@ -194,8 +183,7 @@ void distributeVertices(FILE * fin, pr_int nvtxs, pr_int nedges, pr_graph **last
 		      pr_int const e_id = strtoull(ptr, &end, 10);
 		      /* end of line */
 		      if(ptr == end)
-		        break;		    
-			  //addToList(nnbrs_list, e_id, &nnbrs_count);			  				  	      		      			 
+		        break;		    			  		  				  	      		      			
 		      nnbrs_list[nnbrs_count++] = e_id;
 		      ptr = strtok(NULL, " ");
 		    }		
@@ -293,8 +281,7 @@ int main(int argc, char *argv[]) {
 		*/		
 		graph->nvtxs = nvtxs;
 	  	graph->nedges = nedges;
-	  	graph->start_vertex = 0;
-	  	// TODO - Reallocate with smaller size
+	  	graph->start_vertex = 0;	  	
 
 	  	MPI_Status recv_status;
 
@@ -556,8 +543,10 @@ int main(int argc, char *argv[]) {
 		}
 
 	 	/* Perform AllToAllv */		
-		// MPI_Alltoallv( (void*)PR_send, (void*)per_proc_count, (void*)per_proc_count_disp, MPI_DOUBLE, (void*)PR_recv, (void*)per_proc_count_recv, (void*)per_proc_count_disp_recv, MPI_DOUBLE, MPI_COMM_WORLD);		
-		for(j=1; j<=total_no_proc; j++) {			
+		// MPI_Alltoallv( (void*)PR_send, (void*)per_proc_count, (void*)per_proc_count_disp, MPI_DOUBLE, (void*)PR_recv, (void*)per_proc_count_recv, (void*)per_proc_count_disp_recv, MPI_DOUBLE, MPI_COMM_WORLD);				
+		for(j=1; j<=total_no_proc; j++) {	
+			double s1,s2,e1,e2,s3,e3;
+			s1 = monotonic_seconds();		
 			int send_pos = (rank_of_the_proc + j) % total_no_proc;
 			MPI_Isend(PR_send + per_proc_count_disp[send_pos], per_proc_count[send_pos], MPI_DOUBLE, send_pos, 1, MPI_COMM_WORLD, &reqs[0]);	
 			int recv_pos = (rank_of_the_proc - j + total_no_proc) % total_no_proc;
@@ -566,8 +555,9 @@ int main(int argc, char *argv[]) {
 			int cur_send_pos = (rank_of_the_proc + j - 1) % total_no_proc;
 			int cur_recv_pos = (rank_of_the_proc - j + 1 + total_no_proc) % total_no_proc;
 
+			s2 = monotonic_seconds();
 			int k=0;
-			if(j==1) {
+			if(j==1) {				
 				int edg_ptr = per_proc_outedges_count_disp[cur_send_pos];
 				for(k=0; k<per_proc_count[cur_send_pos]; k++) {
 					int vtx_ptr = k + per_proc_count_disp[cur_send_pos];
@@ -577,7 +567,7 @@ int main(int argc, char *argv[]) {
 						temp_ctr--;		
 						edg_ptr++;				
 					}
-				}			
+				}							
 			}
 			else {
 				int edg_ptr = per_proc_outedges_count_disp_recv[cur_recv_pos];
@@ -592,9 +582,15 @@ int main(int argc, char *argv[]) {
 				}
 			}
 
+			e1 = monotonic_seconds();
 			int r=0;
 			for(r=0;r<2;r++)
 				MPI_Wait(&reqs[r], &status);
+			e2 = monotonic_seconds();
+			if(rank_of_the_proc==2) {
+				printf("Total time : %f\n", e2-s2);
+				printf("Computation : %f\n", e1-s1);
+			}
 		}
 
 		/* Finalize new PR values */		
