@@ -1,0 +1,57 @@
+Pagerank Execution Time : 6.879260
+diff A.pr.txt A-serial.pr.txt
+mpirun -np 2 ./pagerank-parallel-improved A.graph A.pr.txt
+Pagerank Execution Time : 3.303951
+diff A.pr.txt A-serial.pr.txt
+mpirun -np 4 ./pagerank-parallel-improved A.graph A.pr.txt
+Pagerank Execution Time : 1.767097
+diff A.pr.txt A-serial.pr.txt
+mpirun -np 8 ./pagerank-parallel-improved A.graph A.pr.txt
+Pagerank Execution Time : 0.951667
+diff A.pr.txt A-serial.pr.txt
+mpirun -np 16 ./pagerank-parallel-improved A.graph A.pr.txt
+Pagerank Execution Time : 0.622901
+diff A.pr.txt A-serial.pr.txt
+mpirun -np 32 ./pagerank-parallel-improved A.graph A.pr.txt
+Pagerank Execution Time : 0.521190
+diff A.pr.txt A-serial.pr.txt
+
+
+mpirun -np 1 ./pagerank-parallel-improved B.graph B.pr.txt
+Pagerank Execution Time : 6.936235
+diff B.pr.txt B-serial.pr.txt
+mpirun -np 2 ./pagerank-parallel-improved B.graph B.pr.txt
+Pagerank Execution Time : 2.630462
+diff B.pr.txt B-serial.pr.txt
+mpirun -np 4 ./pagerank-parallel-improved B.graph B.pr.txt
+Pagerank Execution Time : 1.772204
+diff B.pr.txt B-serial.pr.txt
+mpirun -np 8 ./pagerank-parallel-improved B.graph B.pr.txt
+Pagerank Execution Time : 1.193274
+diff B.pr.txt B-serial.pr.txt
+mpirun -np 16 ./pagerank-parallel-improved B.graph B.pr.txt
+Pagerank Execution Time : 1.129167
+diff B.pr.txt B-serial.pr.txt
+mpirun -np 32 ./pagerank-parallel-improved B.graph B.pr.txt
+Pagerank Execution Time : 1.400306
+diff B.pr.txt B-serial.pr.txt
+
+
+mpirun -np 1 ./pagerank-parallel-improved live-journal.graph live-journal.pr.txt
+Pagerank Execution Time : 23.878932
+diff live-journal.pr.txt live-journal-serial.pr.txt
+mpirun -np 2 ./pagerank-parallel-improved live-journal.graph live-journal.pr.txt
+Pagerank Execution Time : 13.577461
+diff live-journal.pr.txt live-journal-serial.pr.txt
+mpirun -np 4 ./pagerank-parallel-improved live-journal.graph live-journal.pr.txt
+Pagerank Execution Time : 9.269227
+diff live-journal.pr.txt live-journal-serial.pr.txt
+mpirun -np 8 ./pagerank-parallel-improved live-journal.graph live-journal.pr.txt
+Pagerank Execution Time : 6.419806
+diff live-journal.pr.txt live-journal-serial.pr.txt
+mpirun -np 16 ./pagerank-parallel-improved live-journal.graph live-journal.pr.txt
+Pagerank Execution Time : 5.096407
+diff live-journal.pr.txt live-journal-serial.pr.txt
+mpirun -np 32 ./pagerank-parallel-improved live-journal.graph live-journal.pr.txt
+Pagerank Execution Time : 6.393727
+diff live-journal.pr.txt live-journal-serial.pr.txt

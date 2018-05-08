@@ -144,8 +144,7 @@ void distributeVertices(FILE * fin, pr_int nvtxs, pr_int nedges, pr_graph **last
 	  	graph->total_nvtxs = nvtxs;
 	  	graph->nvtxs = v;
 	  	graph->nedges = nedges;
-	  	graph->start_vertex = v;
-	  	// TODO - Reallocate with smaller size
+	  	graph->start_vertex = v;	  	
 	  	graph->xadj = malloc((nvtxs + 1) * sizeof(*graph->xadj));
 	  	graph->nbrs = malloc(nedges * sizeof(*graph->nbrs));
 
@@ -279,8 +278,7 @@ int main(int argc, char *argv[]) {
 	  	graph->nbrs = malloc(graph->nedges * sizeof(*graph->nbrs));
 		MPI_Recv( (void*)(graph->xadj), graph->nvtxs + 1, MPI_UNSIGNED_LONG_LONG, total_no_proc - 1, 0, MPI_COMM_WORLD, &recv_status);
 		MPI_Recv( (void*)(graph->nbrs), graph->nedges, MPI_UNSIGNED_LONG_LONG, total_no_proc - 1, 0, MPI_COMM_WORLD, &recv_status);
-	}
-	MPI_Barrier(MPI_COMM_WORLD);
+	}	
 
 
 	/*
@@ -352,8 +350,7 @@ int main(int argc, char *argv[]) {
 		grand_total_size = grand_total_size + per_proc_outedges_count[i];
 		per_proc_outedges_count_end[i] = grand_total_size;
 	}
-
-	MPI_Barrier(MPI_COMM_WORLD);
+	
 
 	pr_int* source_nodes_for_proc = (pr_int*)malloc(total_size * sizeof(pr_int));
 	pr_int* source_nodes_for_proc_count = (pr_int*)malloc(total_size  * sizeof(pr_int));
