@@ -63,7 +63,7 @@ void print_graph(pr_graph * graph) {
 	int edge_ptr = 0;
 	for(i=1; i <= graph->nvtxs; i++) {
 		while (edge_ptr < graph->xadj[i]) {
-			fprintf(opFile, "%lu ", graph->nbrs[edge_ptr]+1);
+			fprintf(opFile, "%d ", graph->nbrs[edge_ptr]+1);
 			edge_ptr++;
 		}
 		fprintf(opFile, "\n");
@@ -81,7 +81,7 @@ void print_edges(pr_graph * graph) {
 	int edge_ptr = 0;
 	for(i=1; i <= graph->nvtxs; i++) {
 		while (edge_ptr < graph->xadj[i]) {
-			fprintf(opFile, "%d, %lu\n", start_vertex + (i-1), graph->nbrs[edge_ptr]);
+			fprintf(opFile, "%d, %d\n", start_vertex + (i-1), graph->nbrs[edge_ptr]);
 			edge_ptr++;
 		}
 	}
@@ -151,12 +151,12 @@ void distributeVertices(FILE * fin, pr_int nvtxs, pr_int nedges, pr_graph **last
   		while(v < nvtxs) {
   			ssize_t read = getline(&line, &len, fin);
 		    if(read == -1) {
-		      fprintf(stderr, "ERROR: premature EOF at line %lu\n", v+1);
+		      fprintf(stderr, "ERROR: premature EOF at line %d\n", v+1);
 		      return;
 		    }
 			/* Check for sinks -- these make pagerank more difficult. */
 		    if(read == 1) {
-		      fprintf(stderr, "WARNING: vertex '%lu' is a sink vertex.\n", v+1);
+		      fprintf(stderr, "WARNING: vertex '%d' is a sink vertex.\n", v+1);
 		      continue;
 		    }
 
